@@ -6,6 +6,7 @@ import LayoutPublic from '../layouts/LayoutPublic.tsx'
 import LayoutGolfer from '../layouts/LayoutGolfer.tsx'
 import LayoutTd from '../layouts/LayoutTd.tsx'
 import LayoutAdmin from '../layouts/LayoutAdmin.tsx'
+import Flights from '../pages/td/Flights.tsx'
 
 
 function AppRouter() {
@@ -32,7 +33,7 @@ function AppRouter() {
         <Route path="/td" element={<LayoutTd />} >
           <Route index element={<div>HomeTd</div>} />
           <Route path="/td/tournaments" element={<div>Tournaments Management</div>} />
-          <Route path="/td/flights" element={<div>Flights Management</div>} />
+          <Route path="/td/flights" element={<Flights />} />
         </Route>
 
         { /* Private Routes [GOLFER]*/ }
