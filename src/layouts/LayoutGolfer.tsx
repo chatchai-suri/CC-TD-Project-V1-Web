@@ -6,11 +6,14 @@ import NavBarMain from "./NavBarMain.tsx";
 import NavBarGolfer from "./NavBarGolfer.tsx";
 
 export default function LayoutGolfer() {
-  // 🧠 1. จำลองข้อมูลสถานะและสิทธิ์ผู้เล่น (ตรงตามสัจจะดีไซน์ใน Excel ของป๋า)
+  // 🧠 1. จำลองข้อมูลสถานะและระดับสิทธิ์ผู้ใช้ข้ามฟาก (ตรงตามสัจจะดีไซน์ใน Excel ของป๋า)
   const [user, setUser] = useState({
-    nickname: "ป๋าปู",
-    role: "SCORER", // สิทธิ์ทดสอบ: GOLFER, SCORER, TD, ADMIN
-    profile_icon: "🏌️‍♂️"
+    nickname: "ป๋าปู (Director)",
+    
+    // 🔥 ⚙️ ป๋าปูแก้คำในอัญประกาศตรงนี้คำเดียว จาก "SCORER" สลับร่างเป็น "TD" ได้เลยครับ!
+    role: "TD", 
+    
+    profile_icon: "👑"
   });
 
   // 🚦 2. วาล์วสถานะควบคุมการ ปิด-เปิด แผง Sidebar ด้านข้างบนจอมือถือ
@@ -40,7 +43,6 @@ export default function LayoutGolfer() {
 
         {/* 🔷 พื้นที่ Body Area รูเจาะกลางระบบสำหรับดึงตารางมาพ่นแสดงผล */}
         <main className="flex-1 w-full bg-white p-4 overflow-y-auto">
-          {/* รูเจาะสลับไส้ใน: เมื่อพิมพ์ /golfer/tournaments ข้อความ "Tournaments" จาก AppRouter จะมาโผล่ตรงนี้ทันที */}
           <Outlet />
         </main>
 
