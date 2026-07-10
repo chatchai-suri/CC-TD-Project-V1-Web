@@ -1,83 +1,80 @@
 // src/pages/td/TdTournaments.tsx
-import { useState } from "react";
+
+import { useEffect } from "react";
+import { useNavigate } from "react-router-dom"; // 👈 1. นำเข้าท่อสายส่งสัญญาณทางเดินรถระดับต้นทาง
+import { useGolfStore } from "../../store/useGolfStore";
 
 /**
- * 🎯 หน้าจอหลักของผู้จัดการแข่งขัน (TD Tournament List Directory)[cite: 22]
+ * 🎯 วัตถุประสงค์หลัก: หน้ารายการแข่งขันสำหรับบทบาท TD
+ * สยบบั๊กเส้นแดง pic-4 พร้อมผูกสายนำทางร่วมกับ Actions สลับหมุนสถานะ Zustand คุ้มค่าหน้างาน[cite: 17]
  */
-export default function TdTournaments() {
-  const [tournaments, setTournaments] = useState<any[]>([
-    { no: "n-1", name: "SAT Friendship 13rd", date: "2-Aug-2025", course: "Mountain Shadow GC", status: "Close" },
-    { no: "n", name: "Alpha-Test", date: "26-Jun-2026", course: "Amata Spring CC", status: "Live!" },
-    { no: "n+1", name: "Beta-Test", date: "3-Jul-2026", course: "Khaokheaw CC", status: "Setup" }
-  ]);
+function TdTournaments() {
+  // ดึง State และ Actions ออกมาจากคลังสมองกลส่วนกลาง
+  const tournaments = useGolfStore((state: any) => state.tournaments);
+  const fetchTournaments = useGolfStore((state: any) => state.fetchTournaments);
+  const toggleTournamentStatus = useGolfStore((state: any) => state.toggleTournamentStatus);
+  const isLoading = useGolfStore((state: any) => state.isLoading);
 
-  const toggleStatus = (idNo: string, currentStatus: string) => {
-    let nextStatus = "Setup";
-    if (currentStatus === "Setup") nextStatus = "Live!";
-    else if (currentStatus === "Live!") nextStatus = "Close";
-    else nextStatus = "Setup";
-    setTournaments(prev => prev.map(t => t.no === idNo ? { ...t, status: nextStatus } : t));
-  };
+  const navigate = useNavigate(); // 👈 2. ประกาศตัวแปรรับกระแสสัญญาณควบคุมเส้นทางเดินรถ
+
+  // สั่งยิงกระแสสัญญาณดึงข้อมูลอัตโนมัติทันทีเมื่อเปิดหน้าจอ
+  useEffect(() => {
+    fetchTournaments();
+  }, [fetchTournaments]);
+
+  if (isLoading) return <div className="text-center p-6 text-gray-500">กำลังมุดอุโมงค์ข้อมูล...</div>;
 
   return (
-    <div className="space-y-6">
-      {/* Head Detail Area */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-gray-200 pb-4 gap-4">
-        <div>
-          <h1 className="text-xl font-bold text-slate-800 flex items-center gap-2">🏆 Tournament List (Director View)</h1>
-          <p className="text-xs text-gray-500 mt-1">ยินดีต้อนรับผู้จัดการแข่งขัน: กดปุ่มด้านขวาเพื่อเนรมิตเปิดทัวร์นาเมนต์ใหม่</p>
+    <div className="p-4 max-w-md mx-auto">
+      <h2 className="text-xl font-bold mb-4">รายการแข่งขัน (TD)</h2>
+      
+      {tournaments.length === 0 ? (
+        <p className="text-amber-600 text-center">No Event History 🌟</p>
+      ) : (
+        <div className="space-y-3">
+          {tournaments.map((t: any) => (
+            <div key={t.id} className="p-4 rounded-xl border bg-white shadow-sm">
+              <div className="flex justify-between items-center gap-2">
+                {/* ฝั่งซ้าย: ข้อมูลร่วมแมตช์ จิ้มหัวข้อเพื่อกดสลับสเตตัสทดสอบระบบได้เหมือนเดิม */}
+                <div 
+                  onClick={() => toggleTournamentStatus(t.id)} // 👈 3. นำฟังก์ชันกลับมาแฝงไว้ที่นี่ จิ้มที่กล่องข้อความเพื่อหมุน Loop สเตตัสจำลองได้!
+                  className="cursor-pointer hover:opacity-70 transition-opacity flex-1"
+                  title="คลิกบริเวณข้อความเพื่อทดสอบหมุนเปลี่ยนสถานะแมตช์"
+                >
+                  <h3 className="font-semibold text-gray-800">{t.title}</h3>
+                  <p className="text-xs text-gray-500">{t.course_name} | {t.date}</p>
+                </div>
+                
+                {/* ฝั่งขวา: ปุ่ม Action นำทางสลับรางวิ่งรถตามกฎเหล็กดีไซน์ป๋าปู */}
+                <button
+                  onClick={() => {
+                    // 🔀 เลเยอร์ที่ 1: สถานะ SETUP -> วิ่งมุดท่อไปหน้าจัดสรรก๊วนและสมาชิกผู้เล่น
+                    if (t.status === "setup") {
+                      navigate("/td/flights");
+                    }
+                    // 🔀 เลเยอร์ที่ 2: สถานะ LIVE -> วิ่งทะลวงไปส่องกระดานลีดเดอร์บอร์ดแบบแต้มขยับสดกลางสนาม
+                    else if (t.status === "live") {
+                      navigate(`/td/leaderboard?id=${t.id}&status=live`);
+                    }
+                    // 🔀 เลเยอร์ที่ 3: สถานะ CLOSE -> วิ่งไปเปิดตารางคะแนนสุทธิที่เป็นทางการท้ายแมตช์
+                    else if (t.status === "close") {
+                      navigate(`/td/leaderboard?id=${t.id}&status=final`);
+                    }
+                  }}
+                  className={`px-3 py-1 text-xs rounded-full font-bold transition-all cursor-pointer ${
+                    t.status === "live" ? "bg-emerald-500 text-white animate-pulse" :
+                    t.status === "close" ? "bg-slate-500 text-white" : "bg-amber-400 text-gray-900"
+                  }`}
+                >
+                  {t.status.toUpperCase()}
+                </button>
+              </div>
+            </div>
+          ))}
         </div>
-        <button 
-          onClick={() => alert("เปิดโมดูลสร้างทัวร์นาเมนต์ใหม่...")}
-          className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-lg shadow-sm transition-colors whitespace-nowrap self-start sm:self-center"
-        >
-          ➕ Create New Tournament
-        </button>
-      </div>
-
-      {/* 🏗️ ตารางยุบรวม 3 คอลัมน์สูตรกระชับประหยัดพื้นที่แนวราบ (Option 2 Verified) */}
-      <div className="overflow-x-auto border border-gray-200 rounded-xl shadow-sm bg-white">
-        <table className="w-full text-left border-collapse text-xs">
-          <thead>
-            <tr className="bg-slate-800 text-white font-semibold uppercase tracking-wider border-b border-slate-700">
-              <th className="p-3 w-1/2">Name</th>
-              <th className="p-3 w-1/3">Date / Course</th>
-              <th className="p-3 text-center whitespace-nowrap">Status</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-200 font-medium">
-            {tournaments.map((t: any) => (
-              <tr key={t.no} className="hover:bg-slate-50/60 transition-colors">
-                <td className="p-3 font-bold text-blue-900 align-middle">
-                  <div className="max-w-[180px] sm:max-w-none truncate sm:whitespace-normal">
-                    {t.name}
-                  </div>
-                </td>
-                <td className="p-3 text-gray-600 align-middle space-y-0.5">
-                  <div className="font-semibold text-slate-800 text-[11px]">📅 {t.date}</div>
-                  <div className="text-gray-400 text-[10px] font-normal truncate max-w-[130px] sm:max-w-none">
-                    📍 {t.course}
-                  </div>
-                </td>
-                <td className="p-3 text-center align-middle whitespace-nowrap">
-                  <button
-                    onClick={() => toggleStatus(t.no, t.status)}
-                    className={`min-w-[65px] px-2.5 py-1 rounded-full text-[10px] font-bold shadow-sm border transition-all ${
-                      t.status === "Live!" 
-                        ? "bg-emerald-100 text-emerald-800 border-emerald-300 animate-pulse" 
-                        : t.status === "Close"
-                        ? "bg-gray-100 text-gray-600 border-gray-300"
-                        : "bg-amber-100 text-amber-800 border-amber-300"
-                    }`}
-                  >
-                    {t.status}
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      )}
     </div>
   );
 }
+
+export default TdTournaments;

@@ -1,18 +1,26 @@
-// import React from 'react'
+// src/routes/AppRouter.tsx
+
 import { Route, Routes } from 'react-router-dom'
-// import Layout from '../layouts/Layout.tsx'
-// import Home from '../pages/public/Home.tsx'
 import LayoutPublic from '../layouts/LayoutPublic.tsx'
 import LayoutGolfer from '../layouts/LayoutGolfer.tsx'
 import LayoutTd from '../layouts/LayoutTd.tsx'
 import LayoutAdmin from '../layouts/LayoutAdmin.tsx'
-import Flights from '../pages/td/Flights.tsx'
 import PublicHome from '../pages/public/PublicHome.tsx'
 import AdminHome from '../pages/admin/AdminHome.tsx'
-import GolferTournaments from '../pages/golfer/GolferTournaments.tsx'
-import Leaderboard from '../pages/golfer/LeaderBoard.tsx'
-import TdTournaments from '../pages/td/TdTournaments.tsx'
 
+// ----------------------------------------------------
+// 🏆 สรุปสถานีนำเข้าฝั่งโมดูลผู้จัดการแข่งขัน (TD Modules)
+// ----------------------------------------------------
+import TdTournaments from '../pages/td/TdTournaments.tsx'
+import Flights from '../pages/td/Flights.tsx'
+import TdLeaderboard from '../pages/td/TdLeaderboard.tsx' // 👈 เปิดสายสัญญาณ Import ดับไฟ 404[cite: 19]
+
+// ----------------------------------------------------
+// 🏌️‍♂️ สรุปสถานีนำเข้าฝั่งโมดูลนักกอล์ฟและแคดดี้ (Golfer & Scorer Modules)
+// ----------------------------------------------------
+import GolferTournaments from '../pages/golfer/GolferTournaments.tsx'
+import GolferLeaderboard from '../pages/golfer/GolferLeaderboard.tsx' // 👈 เปลี่ยนชื่อตามมติป๋าปู
+import ScoringPanel from '../pages/golfer/ScoringPanel.tsx' // 👈 นำเข้าไฟล์แผงป้อนคะแนนปุ่มหนาตัวใหม่
 
 function AppRouter() {
   return (
@@ -37,16 +45,18 @@ function AppRouter() {
         { /* Private Routes [TD]*/ }
         <Route path="/td" element={<LayoutTd />} >
           <Route index element={<div>HomeTd</div>} />
-          <Route path="/td/tournaments" element={<TdTournaments />} />
-          <Route path="/td/flights" element={<Flights />} />
+          <Route path="tournaments" element={<TdTournaments />} />
+          <Route path="flights" element={<Flights />} />
+          {/* 🔀 รองรับพาสซิ่ง URL มุดดิน: /td/leaderboard?id=t2&status=live หรือ status=final */}
+          <Route path="leaderboard" element={<TdLeaderboard />} /> 
         </Route>
 
-        { /* Private Routes [GOLFER]*/ }
+        { /* Private Routes [GOLFER & SCORER] */ }
         <Route path="/golfer" element={<LayoutGolfer />} >
           <Route index element={<div>HomeGolfer</div>} />
-          <Route path="/golfer/tournaments" element={<GolferTournaments />} />
-          <Route path="/golfer/leaderboard" element={<Leaderboard />} />
-          <Route path="/golfer/scoringPanel" element={<div>Scoring Panel</div>} />
+          <Route path="tournaments" element={<GolferTournaments />} />
+          <Route path="leaderboard" element={<GolferLeaderboard />} /> {/* 👈 อัปเดตคอมโพเนนต์ปลายทาง */}
+          <Route path="scoringPanel" element={<ScoringPanel />} /> {/* 👈 เสียบแทนกล่องสตริงเดิม ดับไฟ 404 เด็ดขาด */}
         </Route>
 
         <Route path="*" element={<div>404 Not Found</div>} />
