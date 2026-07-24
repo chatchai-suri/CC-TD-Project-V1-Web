@@ -8,5 +8,7 @@ export default defineConfig({
     react(),
     tailwindcss(), // 👈 2. เพิ่มปลั๊กอิน v4 ตรงนี้
   ],
-    
+  preview: {
+    allowedHosts: true // 👈 เพิ่มบรรทัดนี้เพื่ออนุญาต Cloudflare Tunnel
+  }
 })

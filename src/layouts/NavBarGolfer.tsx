@@ -1,20 +1,56 @@
 // src/layouts/NavBarGolfer.tsx
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom"; 
+import { useGolfStore } from "../store/useGolfStore"; 
 
 /**
  * 🎯 Component เมนูด้านข้างแปรสภาพสิทธิ์ฝั่งผู้เล่น (Contextual Golfer Side Navigation)
- * @param isOpen สถานะ Boolean สั่งสไลด์แผงกางเข้า/ซ่อนออกบน Mobile Responsive
+ * @param isOpen Status Boolean สั่งสไลด์แผงกางเข้า/ซ่อนออกบน Mobile Responsive
  * @param onClose ฟังก์ชัน Callback สำหรับสั่งพับปิดแผง Sidebar คืนพื้นที่หน้าจอ
- * @param user ข้อมูลวัตถุผู้ใช้งานในการคุมลอจิก Role-Based Rendering
+ * @param user ข้อมูลวัตถุผู้ใช้งานในการคุมลоจิก Role-Based Rendering
  */
 export default function NavBarGolfer({ isOpen, onClose, user }: any) {
+
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const location = useLocation();
+
+  // 💡 ดึงกระแสข้อมูลโปรไฟล์ผู้ใช้งานจริงและแอคชันเคลียร์ถังข้อมูลข้ามเครือข่ายจาก Zustand[cite: 34]
+  const logout = useGolfStore((state: any) => state.logout); 
+
+  // 📥 แอบแกะรอยพารามิเตอร์แมตช์ที่กำลังค้างอยู่บน URL ปัจจุบันมาสแตนด์บายใน Sidebar
+  const tournamentId = searchParams.get("id") || "t2";
+  const currentStatus = searchParams.get("status") || "live";
+
+  /**
+   * 🎯 วัตถุประสงค์: สับท่อพาผู้เล่นกลับบอร์ดผู้นำสดรายการเดิมพ่วงพารามิเตอร์ครบวงจร ป้องกันระบบหลงทิศ
+   */
+  const handleLeaderboardNav = () => {
+    onClose(); // สั่งพับปิดบานหน้าต่างสไลด์ Sidebar ลงตู้เซฟ
+    navigate(`/golfer/leaderboard?id=${tournamentId}&status=${currentStatus}`);
+  };
+
 
   // 🎨 Function คำนวณ CSS Class สำหรับ Active State ไฮไลต์สีปุ่มนำทางสโมสร
   const getSidebarClass = (path: string) => {
     return location.pathname === path
       ? "px-4 py-2.5 bg-slate-800 text-yellow-400 rounded-lg text-sm font-medium flex items-center gap-2 border-l-4 border-yellow-400"
       : "px-4 py-2.5 hover:bg-slate-800 text-slate-300 hover:text-white rounded-lg text-sm flex items-center gap-2 transition-colors";
+  };
+
+  /**
+   * 🎯 วัตถุประสงค์: สับรางระเบิดเซสชันสิทธิ์ และสั่งอพยพผู้ใช้ดิ่งกลับสู่หน้าแรก
+   * @description ล้างประวัติในคลัง Zustand ดับหน้าต่างแผงข้าง และ Navigate พารถพุ่งตรงไปที่พากรากหลัก /
+   */
+  const handleLogoutAction = () => {
+    logout(); // 💡 ข้อ 1. เคลียร์ค่าความทรงจำกลางในสเตตให้แปรสภาพกลับเป็น null
+    
+    if (onClose) {
+      onClose(); // 💡 ข้อ 2. สั่งพับปิดแผง Sidebar บนหน้าจอ iPhone SE ให้สนิท
+    }
+    
+    alert("ออกจากระบบสำเร็จ"); // 💡 ข้อ 3. ป๊อปอัปแจ้งเตือนผู้ใช้งาน
+    
+    navigate("/"); // 👑 ข้อ 4. ล็อกคาถาดีดตัวนำทางหันหัวรถดิ่งกลับสู่หน้า Landing Page ทันที!
   };
 
   return (
@@ -74,8 +110,18 @@ export default function NavBarGolfer({ isOpen, onClose, user }: any) {
             </span>
 
             <Link to="/golfer/tournaments" onClick={onClose} className={getSidebarClass("/golfer/tournaments")}>🏆 Tournament List</Link>
+            {/* 🔗 ปุ่มทางด่วนขากลับ: กดแล้วกระชากพาส URL ดีดตัวกลับสู่หน้าบอร์ดผู้นำสดทันที */}
+            {/* 
+            
             <Link to="/golfer/leaderboard" onClick={onClose} className={getSidebarClass("/golfer/leaderboard")}>📊 Leader Board</Link>
             
+            */}
+            <button
+              onClick={handleLeaderboardNav}
+              className="w-full text-left px-3 py-2 rounded-xl flex items-center gap-2 hover:bg-slate-800 font-bold transition-all text-slate-300 hover:text-white"
+            >
+              📊 Leader Board
+            </button>
             {/* ดักเปิดปุ่ม Scoring Panel ให้สิทธิ์เฉพาะ Scorer, TD และ Admin เท่านั้น */}
             {(user.role === "SCORER" || user.role === "TD" || user.role === "ADMIN") && (
               <Link to="/golfer/scoringPanel" onClick={onClose} className={getSidebarClass("/golfer/scoringPanel")}>📝 Scoring Panel</Link>
@@ -86,7 +132,7 @@ export default function NavBarGolfer({ isOpen, onClose, user }: any) {
               🔴 ส่วนที่ 4: Logout ปุ่มกดออกจากระบบ ดีดลงใต้สุดเว้นระยะปลอดภัย
               ========================================================= */}
           <button 
-            onClick={() => { onClose(); alert("ออกจากระบบสำเร็จ"); }}
+            onClick={handleLogoutAction} // 💡 สวมสายสัญญาณคำสั่งพารถพุ่งนำทางฉบับปรับปรุงใหม่
             className="mt-auto px-4 py-2.5 text-left text-red-400 hover:bg-red-950/30 hover:text-red-300 rounded-lg text-sm flex items-center gap-2 font-medium border border-red-900/20 transition-colors shadow-inner"
           >
             🚪 Logout

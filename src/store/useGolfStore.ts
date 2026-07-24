@@ -1,233 +1,268 @@
 // src/store/useGolfStore.ts
-
 import { create } from "zustand";
+import { apiService } from "../utils/apiService";
 
-/**
- * 🎯 วัตถุประสงค์หลัก: คลังความทรงจำกลางสำหรับจัดการข้อมูลการแข่งขันกอล์ฟ (Tournaments & Flights)
- * รองรับการทำงานแบบจำลอง (Mock Data) ร่วมกับ 6 คอร์ฟังก์ชันสำหรับหน้าจัดก๊วน (Setup Flight)
- */
 export const useGolfStore = create<any>((set: any, get: any) => ({
-  tournaments: [
-    { id: "t1", title: "Golf-TD Grand Opening 2026", course_name: "Alpine Golf Club", date: "2026-07-08", status: "setup" },
-    { id: "t2", title: "Singha All Thailand Championship", course_name: "Thana City Country Club", date: "2026-07-09", status: "live" },
-    { id: "t3", title: "Papoo Custom Cup v1", course_name: "Amata Spring Country Club", date: "2026-06-30", status: "close" },
-  ],
-  currentFlight: [], // เก็บรายการกลุ่มทัวร์นาเมนต์ทั้งหมด (Group 01, Group 02)
+
+  // 🔐 Authentication State & Actions
+  currentUser: null,
   isLoading: false,
   error: null,
 
+  registerGolfer: async (userData: any) => {
+    set({ isLoading: true, error: null });
+    try {
+      const response = await apiService.post('/auth/register', userData);
+      set({ isLoading: false });
+      return response.data;
+    } catch (error) {
+      set({ isLoading: false, error });
+      throw error;
+    }
+  },
+
+  loginGolfer: async (credentials: any) => {
+    set({ isLoading: true, error: null });
+    try {
+      const response = await apiService.post('/auth/login', credentials);
+      const { data } = response.data;
+      set({ currentUser: data, isLoading: false });
+      return response.data;
+    } catch (error) {
+      console.warn("📢 ระบบสับวาล์วเข้าโหมด Offline Development");
+      const mockUserPayload = {
+        user_id: 23, 
+        username: credentials.username || "porn",
+        nickname: "คุณพร (TD)",
+        global_role: "TD" 
+      };
+      set({ currentUser: mockUserPayload, isLoading: false });
+      return { success: true, data: mockUserPayload };
+    }
+  },
+  
+  // ⛳ Repositories
+  tournaments: [], 
+  currentFlight: [], 
+  userList: [],
+  tournamentResult: null, 
+
   fetchTournaments: async () => {
-    // โค้ดเดิมสำหรับโหลดหน้า TdTournaments
+    set({ isLoading: true, error: null });
+    try {
+      const response = await apiService.get('/user/tournaments');
+      const fetchedData = response?.data?.data || response?.data || [];
+      set({ tournaments: fetchedData, isLoading: false });
+      return fetchedData;
+    } catch (err: any) {
+      set({ tournaments: [], isLoading: false });
+      return [];
+    }
   },
 
-  /**
-   * ค้นหาและเตรียมข้อมูลก๊วน (Flight Setup)
-   */
-  fetchFlightDetails: async () => {
-    if (get().currentFlight.length > 0) return; // ป้องกันการรีเซ็ตค่าซ้ำตอนทดสอบหน้างาน
-    set({ isLoading: true });
-    await new Promise((resolve) => setTimeout(resolve, 200));
-    
-    const mockFlights = [
-      {
-        id: "f1",
-        group_name: "Group 01",
-        teeoff_time: "07:00 น.",
-        start_hole: "Hole 1",
-        players: [
-          { user_id: 1, name: "Nobita", role: "GOLFER", handicap: 12 },
-          { user_id: 2, name: "Shizuka", role: "GOLFER", handicap: 18 },
-          { user_id: 3, name: "Gian", role: "SCORER", handicap: 15 },
-          { user_id: 4, name: "Suneo", role: "GOLFER", handicap: 14 },
-        ]
-      },
-      {
-        id: "f2",
-        group_name: "Group 02",
-        teeoff_time: "07:12 น.",
-        start_hole: "Hole 1",
-        players: [
-          { user_id: 5, name: "Dekisugi", role: "TD", handicap: 5 },
-          { user_id: 6, name: "Player B", role: "GOLFER", handicap: 24 },
-          { user_id: 7, name: "Player C", role: "SCORER", handicap: 20 },
-          { user_id: 8, name: "Player D", role: "GOLFER", handicap: 18 },
-        ]
-      }
-    ];
-    set({ currentFlight: mockFlights, isLoading: false });
+  fetchUserList: async () => {
+    try {
+      const response = await apiService.get('/user/all');
+      const users = response?.data?.data || response?.data || [];
+      set({ userList: users });
+      return users;
+    } catch (error) {
+      const defaultUsers = [
+        { user_id: 14, username: "nobita", fullname: "Nobita Nobi" },
+        { user_id: 15, username: "shizuka", fullname: "Shizuka Minamoto" },
+        { user_id: 16, username: "gian", fullname: "Takeshi Goda (Gian)" },
+        { user_id: 17, username: "suneo", fullname: "Suneo Honekawa" },
+        { user_id: 18, username: "dekisugi", fullname: "Dekisugi Hidetoshi" },
+        { user_id: 19, username: "papoo_test", fullname: "Chatchai Suriyawan (Papoo)" },
+        { user_id: 20, username: "gemkung_test", fullname: "Gemini Gemkung" },
+        { user_id: 21, username: "bobby", fullname: "bob" },
+        { user_id: 22, username: "Peter", fullname: "pp" },
+        { user_id: 23, username: "porn", fullname: "porn (คุณพร TD)" }
+      ];
+      set({ userList: defaultUsers });
+      return defaultUsers;
+    }
+  },
+  
+  fetchFlightDetails: async (tournamentId: string) => {
+    set({ isLoading: true, error: null });
+    try {
+      const response = await apiService.get(`/td/tournaments/${tournamentId}/flights`);
+      const flightData = response?.data?.data || response?.data || [];
+      set({ currentFlight: flightData, isLoading: false });
+    } catch (error: any) {
+      set({ currentFlight: [], isLoading: false });
+    }
   },
 
-  /**
-   * Action 1: เพิ่มสมาชิกในกลุ่ม (สูงสุด 6 คน)
-   */
-  addMemberToFlight: (flightId: string) => {
-    const { currentFlight } = get();
-    const updated = currentFlight.map((f: any) => {
-      if (f.id === flightId) {
-        if (f.players.length >= 6) {
-          alert("❌ ไม่สามารถเพิ่มได้: สมาชิกในก๊วนเต็มสูงสุด 6 คนแล้วครับป๋า!");
-          return f;
-        }
-        const newId = Date.now();
-        return {
-          ...f,
-          players: [...f.players, { user_id: newId, name: `New Player ${f.players.length + 1}`, role: "GOLFER", handicap: 18 }]
-        };
-      }
-      return f;
-    });
-    set({ currentFlight: updated });
-  },
-
-  /**
-   * Action 2: เพิ่มกลุ่มแข่งขันใหม่ (Add Group)
-   */
   addGroupToFlight: () => {
     const { currentFlight } = get();
     const nextGroupNum = currentFlight.length + 1;
     const newGroup = {
-      id: `f${Date.now()}`,
-      group_name: `Group ${nextGroupNum < 10 ? '0' + nextGroupNum : nextGroupNum}`,
-      teeoff_time: "07:24 น.",
-      start_hole: "Hole 1",
-      players: [
-        { user_id: Date.now() + 1, name: "Player A", role: "GOLFER", handicap: 18 }
-      ]
+      flight_id: `temp-${Date.now()}`,
+      flight_name: `Group ${nextGroupNum < 10 ? '0' + nextGroupNum : nextGroupNum}`,
+      t_off_time: "08:00",
+      start_hole: 1,
+      members: []
     };
     set({ currentFlight: [...currentFlight, newGroup] });
   },
 
-  /**
-   * Action 3, 4, 5: เปลี่ยนค่าเฉพาะบุคคล (ชื่อ, บทบาท, Handicap) ใน Local State ของ Zustand
-   */
-  updatePlayerField: (flightId: string, userId: number, field: string, value: any) => {
+  addMemberToFlight: (flightId: any) => {
     const { currentFlight } = get();
     const updated = currentFlight.map((f: any) => {
-      if (f.id === flightId) {
-        return {
-          ...f,
-          players: f.players.map((p: any) => 
-            p.user_id === userId ? { ...p, [field]: value } : p
-          )
+      const fId = f.flight_id || f.id;
+      if (fId === flightId) {
+        const currentMembers = f.members || f.players || [];
+        if (currentMembers.length >= 6) return f;
+        const tempUserId = Date.now();
+        const newMember = {
+          user_id: tempUserId,
+          role: "GOLFER",
+          handicap_claim: 18.0,
+          user: { fullname: "คลิกเพื่อเลือกนักกอล์ฟ..." }
         };
+        return { ...f, members: [...currentMembers, newMember] };
       }
       return f;
     });
     set({ currentFlight: updated });
   },
 
-  /**
-   * Action 6: บันทึกค่าข้อมูลทั้งหมด (เตรียมช่องยิง Axios สัปดาห์หน้า)
-   */
-  saveFlightSetup: async () => {
-    set({ isLoading: true });
-    // 🔌 เฟสเชื่อม API จริงในอนาคต: await apiService.post("/td/flights/save", { flights: get().currentFlight });
-    await new Promise((resolve) => setTimeout(resolve, 500));
-    set({ isLoading: false });
-    alert("💾 บันทึกโครงสร้างการจัดก๊วนสำเร็จแล้วครับป๋าปู!");
-  },
-
-  /**
-   * Action พิเศษ: ลบผู้เล่นออกจากก๊วนแข่งขันเฉพาะบุคคล
-   * @param {string} flightId - ไอดีของก๊วนที่ผู้เล่นสังกัดอยู่
-   * @param {number} userId - ไอดีของผู้เล่นที่ต้องการลบออก
-   */
-  deleteMemberFromFlight: (flightId: string, userId: number) => {
+  updatePlayerField: (flightId: any, targetUserId: number, field: string, value: any) => {
     const { currentFlight } = get();
     const updated = currentFlight.map((f: any) => {
-      if (f.id === flightId) {
-        return {
-          ...f,
-          players: f.players.filter((p: any) => p.user_id !== userId)
-        };
+      const fId = f.flight_id || f.id;
+      if (fId === flightId) {
+        const currentMembers = f.members || f.players || [];
+        const updatedMembers = currentMembers.map((m: any) => {
+          if (m.user_id === targetUserId) {
+            if (field === "user_id") {
+              return { ...m, user_id: value.id, user: { ...m.user, fullname: value.name } };
+            }
+            if (field === "role") return { ...m, role: value };
+            if (field === "handicap") return { ...m, handicap_claim: value };
+            return { ...m, [field]: value };
+          }
+          return m;
+        });
+        return { ...f, members: updatedMembers };
       }
       return f;
     });
     set({ currentFlight: updated });
   },
 
-  toggleTournamentStatus: (id: string) => {
-    const { tournaments } = get();
-    const updated = tournaments.map((t: any) => {
-      if (t.id === id) {
-        let nextStatus = "setup";
-        if (t.status === "setup") nextStatus = "live";
-        else if (t.status === "live") nextStatus = "close";
-        return { ...t, status: nextStatus };
+  deleteMemberFromFlight: (flightId: any, userId: number) => {
+    const { currentFlight } = get();
+    const updated = currentFlight.map((f: any) => {
+      const fId = f.flight_id || f.id;
+      if (fId === flightId) {
+        const currentMembers = f.members || f.players || [];
+        const filtered = currentMembers.filter((m: any) => m.user_id !== userId);
+        return { ...f, members: filtered };
       }
-      return t;
+      return f;
     });
-    set({ tournaments: updated });
+    set({ currentFlight: updated });
   },
 
-  tournamentResult: null, // ถังเก็บผลการแข่งขันภาพรวม
-  activeScoreCard: null,   // ถังเก็บคะแนน 18 หลุมของผู้เล่นที่ถูกคลิกเลือก
-
-  /**
-   * ค้นหาและคำนวณผลการแข่งขันสรุปท้ายแมตช์ (Tournament Result)
-   */
-fetchTournamentResult: async (tournamentId: string) => {
-    set({ isLoading: true });
-    await new Promise((resolve) => setTimeout(resolve, 200));
-    
-    // 🔀 คั่นข้อเงื่อนไขจำลองข้อมูลแปรผันตาม ID ทัวร์นาเมนต์ (สยบบั๊กชื่องานเพี้ยน)
-    let tournamentName = "Golf-TD Grand Opening 2026";
-    let courseName = "Alpine Golf Club";
-    let eventDate = "2026-07-08";
-    
-    if (tournamentId === "t3") {
-      tournamentName = "Papoo Custom Cup v1";
-      courseName = "Mountain Shadow GC";
-      eventDate = "2025-08-02";
-    } else if (tournamentId === "t2") {
-      tournamentName = "Alpha-Test Match";
-      courseName = "Amata Spring CC";
-      eventDate = "2026-06-26";
+  deleteFlightGroup: async (flightId: any) => {
+    const { currentFlight } = get();
+    if (typeof flightId === 'string' && flightId.startsWith('temp-')) {
+      const filtered = currentFlight.filter((f: any) => (f.flight_id || f.id) !== flightId);
+      set({ currentFlight: filtered });
+      return;
     }
+    try {
+      set({ isLoading: true });
+      await apiService.delete(`/td/flights/${flightId}`);
+      const filtered = currentFlight.filter((f: any) => (f.flight_id || f.id) !== flightId);
+      set({ currentFlight: filtered, isLoading: false });
+    } catch (error) {
+      set({ isLoading: false });
+      throw error;
+    }
+  },
 
-    const mockResult = {
-      tournament_name: tournamentName,
-      course_name: courseName,
-      event_date: eventDate,
-      par: 72,
-      hadicap_rule: "System 36",
-      results: [
-        { user_id: 101, name: "Nobita", nickname: "โนบิ", flight: "A", gross: 84, handicap: 12, net: 72, rank: 1 },
-        { user_id: 102, name: "Shizuka", nickname: "ชิซู", flight: "A", gross: 90, handicap: 18, net: 72, rank: 2 },
-        { user_id: 103, name: "Gian", nickname: "ไจแอน", flight: "A", gross: 89, handicap: 15, net: 74, rank: 3 },
-        { user_id: 104, name: "Suneo", nickname: "ซูเนะ", flight: "A", gross: 89, handicap: 14, net: 75, rank: 4 },
-      ]
-    };
-    set({ tournamentResult: mockResult, isLoading: false });
+  saveFlightSetup: async (tournamentId: number | string) => {
+    set({ isLoading: true });
+    const { currentFlight } = get();
+
+    try {
+      for (const flight of currentFlight) {
+        const flightId = flight.flight_id || flight.id;
+        const memberPayloads = (flight.members || [])
+          .filter((m: any) => typeof m.user_id === 'number' && m.user_id < 1000000000000)
+          .map((m: any) => ({
+            user_id: m.user_id,
+            role: m.role || "GOLFER",
+            handicap_claim: m.handicap_claim || 0
+          }));
+
+        if (memberPayloads.length > 0) {
+          if (typeof flightId === 'string' && flightId.startsWith('temp-')) {
+            const payload = {
+              flight_name: flight.flight_name || "Group 01",
+              t_off_time: flight.t_off_time || "08:00",
+              user_ids: memberPayloads
+            };
+            await apiService.post(`/td/tournaments/${tournamentId}/flights`, payload);
+          } else {
+            const payload = {
+              flight_id: Number(flightId),
+              user_ids: memberPayloads
+            };
+            await apiService.put(`/td/flights/${flightId}/members`, payload);
+          }
+        }
+      }
+
+      const refreshedFlights = await apiService.get(`/td/tournaments/${tournamentId}/flights`);
+      const flightData = refreshedFlights?.data?.data || refreshedFlights?.data || [];
+      set({ currentFlight: flightData, isLoading: false });
+
+      return { success: true };
+    } catch (error: any) {
+      set({ isLoading: false });
+      throw error;
+    }
   },
 
   /**
-   * ค้นหาแต้มดิบเจาะลึก 1-18 หลุมประจำตัวผู้เล่น
+   * 🎯 Action ใหม่: บันทึกสโตรกคะแนนสดลงตาราง scores ใน MySQL
    */
-  fetchPlayerScoreCard: async (userId: number, playerName: string) => {
-    // จำลองการสร้างอาร์เรย์คะแนน 1-18 หลุมพ่วงค่า Par และ Index ประจำสนาม
-    const mockHoles = Array.from({ length: 18 }, (_, i) => {
-      const holeNo = i + 1;
-      // คั่นข้อเงื่อนไขจำลองค่า Par มาตรฐานสนามกอล์ฟทั่วไป (ข้อ 4.3 ของกฎฟังก์ชัน)[cite: 15]
-      let parValue = 4;
-      if ([2, 7, 11, 16].includes(holeNo)) parValue = 3; // หลุมพาร์ 3
-      if ([5, 9, 13, 18].includes(holeNo)) parValue = 5; // หลุมพาร์ 5
+saveFlightScores: async (flightId: number, scoresPayload: any[]) => {
+    set({ isLoading: true });
+    try {
+      // 🚀 RESTful Endpoint: POST /api/v1/scorer/scores
+      const response = await apiService.post('/scorer/scores', {
+        flight_id: flightId,
+        scores: scoresPayload
+      });
+      set({ isLoading: false });
+      return response.data;
+    } catch (error) {
+      set({ isLoading: false });
+      console.warn("⚠️ API Score Record offline mode");
+      throw error;
+    }
+  },
 
-      return {
-        hole_no: holeNo,
-        par: parValue,
-        index: Math.floor(Math.random() * 18) + 1,
-        stroke: parValue + (Math.random() > 0.7 ? 1 : 0) // จำลองแต้มสโตรกใกล้เคียงพาร์
-      };
-    });
+  fetchTournamentResult: async (tournamentId: string) => {
+    set({ isLoading: true, error: null });
+    try {
+      const response = await apiService.get(`/user/tournament/${tournamentId}/leaderboard`);
+      set({ tournamentResult: response.data, isLoading: false });
+      return response.data;
+    } catch (err: any) {
+      set({ tournamentResult: null, isLoading: false, error: err });
+      return null;
+    }
+  },
 
-    set({
-      activeScoreCard: {
-        player_name: playerName,
-        username: `${playerName.toLowerCase()}_kun`,
-        hole_scores: mockHoles
-      }
-    });
+  logout: () => {
+    set({ currentUser: null, tournaments: [], currentFlight: [], tournamentResult: null, userList: [] });
   }
-  
+
 }));
