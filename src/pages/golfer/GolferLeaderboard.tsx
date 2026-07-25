@@ -10,7 +10,7 @@ export default function GolferLeaderboard() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   
-  const tournamentId = searchParams.get("id") || "5";
+  const tournamentId = searchParams.get("id") || "9";
   
   const tournamentResult = useGolfStore((state: any) => state.tournamentResult);
   const fetchTournamentResult = useGolfStore((state: any) => state.fetchTournamentResult);
@@ -25,24 +25,22 @@ export default function GolferLeaderboard() {
     }
   }, [tournamentId, fetchTournamentResult]);
 
-  const isLiveMode = tournamentResult?.status === "live";
+  // 🎯 แก้จุดหลุด Case-Sensitive: แปลงสถานะเป็นตัวพิมพ์เล็กป้องกัน "LIVE" ชน "live"
+  const matchStatus = (tournamentResult?.status || searchParams.get("status") || "live").toLowerCase();
+  const isLiveMode = matchStatus === "live";
+  
   const displayLeaderboard = tournamentResult?.leaderboard || [];
   const userRole = currentUser?.global_role || "GUEST";
 
   const handlePlayerClick = (userId: number, playerName: string) => {
-    const matchStatus = tournamentResult?.status || "live"; 
-    const currentRole = currentUser?.global_role || "TD"; 
+    const currentRole = currentUser?.global_role || "GUEST"; 
 
-    if (matchStatus === "live" && (currentRole === "SCORER" || currentRole === "GOLFER" || currentRole === "TD")) {
+    if (isLiveMode && (currentRole === "SCORER" || currentRole === "GOLFER" || currentRole === "TD" || currentRole === "ADMIN")) {
       navigate(`/golfer/scoringPanel?id=${tournamentId}&userId=${userId}&name=${encodeURIComponent(playerName)}&status=${matchStatus}`);
-    } else if ((matchStatus === "final" || matchStatus === "close") && currentRole !== "GUEST") {
+    } else if (!isLiveMode && currentRole !== "GUEST") {
       navigate(`/golfer/scorecard?id=${tournamentId}&userId=${userId}&name=${encodeURIComponent(playerName)}&status=${matchStatus}`);
-    } else if (matchStatus === "setup" && (currentRole === "TD" || currentRole === "ADMIN")) {
-      navigate(`/td/flights?id=${tournamentId}`);
     }
   };
-
-  // 🎯 ปรับแก้เฉพาะฟังก์ชัน handleCloseTournament ใน GolferLeaderboard.tsx:
 
   const handleCloseTournament = async (secretHoles: number[]) => {
     try {
@@ -60,7 +58,6 @@ export default function GolferLeaderboard() {
           showConfirmButton: false
         });
         
-        // 💡 แก้จุดเด้งหลุด: สั่งดึงข้อมูลบอร์ดใหม่แทนการ reload ทั้งหน้า
         if (fetchTournamentResult) {
           fetchTournamentResult(tournamentId);
         }
@@ -76,25 +73,25 @@ export default function GolferLeaderboard() {
   };
 
   return (
-    <div className="w-full bg-white text-slate-900 font-sans p-1">
+    <div className="w-full bg-white text-slate-900 font-sans p-1 sm:p-4">
       {/* ส่วนหัวป้ายนำทาง */}
       <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
         <button
-          onClick={() => navigate("/td/tournaments")}
+          onClick={() => navigate("/golfer/tournaments")}
           className="inline-flex items-center gap-1 text-xs font-semibold text-blue-600 hover:text-blue-800 transition-colors cursor-pointer"
         >
           ⬅️ กลับไปตารางแข่ง
         </button>
-        <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
+        <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
           isLiveMode ? "bg-red-500 text-white animate-pulse" : "bg-emerald-600 text-white"
         }`}>
           {isLiveMode ? "⚡ LIVE SCORE" : "🏆 FINAL SCORE"}
         </span>
       </div>
 
-      {/* 👑 แผงควบคุมสโมสรส่วนพิเศษ */}
+      {/* 👑 แผงควบคุมสโมสรส่วนพิเศษสำหรับ TD */}
       {(userRole === "TD" || userRole === "ADMIN") && isLiveMode && (
-        <div className="mb-4 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 p-2.5 rounded-2xl flex items-center justify-between shadow-sm animate-fadeIn">
+        <div className="mb-4 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 p-2.5 rounded-2xl flex items-center justify-between shadow-sm">
           <div className="text-left">
             <span className="text-xs font-black text-amber-900 flex items-center gap-1">
               <span>👑</span> แผงควบคุมสโมสร (TD Control)
@@ -121,12 +118,12 @@ export default function GolferLeaderboard() {
       {/* บล็อกหัวเรื่องภาพรวมแมตช์ */}
       <div className="mb-4 text-left">
         <h3 className="text-base font-black text-slate-900 tracking-tight line-clamp-1">
-          🏆 {tournamentResult?.tournament_name || "Papoo Alpha Championship 2026"}
+          🏆 {tournamentResult?.tournament_name || "Amata Alpha Championship 2026"}
         </h3>
         <p className="text-[11px] text-slate-500 mt-0.5 flex items-center gap-1.5">
           <span>📍 Amata Spring CC</span>
           <span className="text-slate-300">|</span>
-          <span>📅 2026-06-23</span>
+          <span>📅 2026-07-23</span>
         </p>
         
         {/* กล่องเฉลยหลุมลับ */}
@@ -140,7 +137,7 @@ export default function GolferLeaderboard() {
         </div>
 
         <div className="mt-2 flex flex-wrap gap-2 text-[10px] bg-slate-50 p-2 rounded-lg border border-slate-100">
-          <span className="text-slate-600 font-medium">⛳ Par: <strong className="text-slate-950 font-bold">{tournamentResult?.par || 72}</strong></span>
+          <span className="text-slate-600 font-medium">⛳ Par: <strong className="text-slate-950 font-bold">{tournamentResult?.par || 71}</strong></span>
           <span className="text-slate-300">|</span>
           <span className="text-slate-600 font-medium">📋 Rule: <strong className="text-slate-950 font-bold">{tournamentResult?.handicap_rule || "Peoria-DMN System"}</strong></span>
         </div>

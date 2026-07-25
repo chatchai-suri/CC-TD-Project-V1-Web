@@ -1,5 +1,6 @@
 // src/components/PeoriaModal.tsx
 import React, { useState } from 'react';
+import { useGolfStore } from '../store/useGolfStore';
 
 interface HoleInfo {
   hole_no: number;
@@ -13,28 +14,48 @@ interface PeoriaModalProps {
   holesData?: HoleInfo[];
 }
 
-// 💡 อัปเดตข้อมูล Par จริงจากสนามใน DB (pic6): Par รวม 71 (OUT: 36, IN: 35)
-const DEFAULT_HOLES: HoleInfo[] = [
-  { hole_no: 1, par: 4 }, { hole_no: 2, par: 3 }, { hole_no: 3, par: 4 },
-  { hole_no: 4, par: 4 }, { hole_no: 5, par: 5 }, { hole_no: 6, par: 4 },
-  { hole_no: 7, par: 3 }, { hole_no: 8, par: 4 }, { hole_no: 9, par: 5 },
-  { hole_no: 10, par: 4 }, { hole_no: 11, par: 5 }, { hole_no: 12, par: 3 },
-  { hole_no: 13, par: 4 }, { hole_no: 14, par: 4 }, { hole_no: 15, par: 4 },
-  { hole_no: 16, par: 4 }, { hole_no: 17, par: 3 }, { hole_no: 18, par: 4 }
-];
-
 export default function PeoriaModal({
   isOpen,
   onClose,
   onSubmit,
-  holesData = DEFAULT_HOLES
+  holesData = []
 }: PeoriaModalProps) {
   const [selectedHoles, setSelectedHoles] = useState<number[]>([]);
+  
+  // 🏛️ ดึง Master Holes จาก Zustand Store เป็นด่านสำรอง
+  const storeHoles = useGolfStore((state: any) => state.courseHoles || []);
+  const tournamentResult = useGolfStore((state: any) => state.tournamentResult);
 
   if (!isOpen) return null;
 
-  const outHoles = holesData.filter(h => h.hole_no <= 9);
-  const inHoles = holesData.filter(h => h.hole_no >= 10);
+  // 🎯 เลือกลิสต์ 18 หลุม Master จาก Props -> Store Cache -> tournamentResult
+  const activeHolesList: HoleInfo[] = 
+    holesData.length >= 18 
+      ? holesData 
+      : storeHoles.length >= 18 
+        ? storeHoles 
+        : (tournamentResult?.holes || []);
+
+  // 🔒 Fail Explicitly: ป้องกันข้อมูลหลอน หากไม่มี Master Data จาก DB ให้เตือน
+  if (!activeHolesList || activeHolesList.length < 18) {
+    return (
+      <div className="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-3 animate-fadeIn">
+        <div className="bg-white rounded-2xl p-6 text-center max-w-[320px] space-y-3 shadow-2xl border border-slate-200">
+          <p className="text-sm font-bold text-red-600">⚠️ ไม่สามารถโหลดข้อมูลสนามแข่งได้</p>
+          <p className="text-xs text-slate-500">กรุณาตรวจสอบการเชื่อมต่อฐานข้อมูล Master Holes ประจำแมตช์</p>
+          <button 
+            onClick={onClose} 
+            className="px-5 py-2 bg-slate-800 text-white rounded-xl text-xs font-bold hover:bg-slate-900 transition-all cursor-pointer"
+          >
+            ปิดหน้าต่าง
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const outHoles = activeHolesList.filter(h => h.hole_no <= 9);
+  const inHoles = activeHolesList.filter(h => h.hole_no >= 10);
 
   const toggleHole = (holeNo: number) => {
     if (selectedHoles.includes(holeNo)) {
@@ -91,7 +112,7 @@ export default function PeoriaModal({
             <h3 className="font-black text-sm text-amber-400">🎲 สุ่มจับฉลาก 12 หลุมลับ</h3>
             <p className="text-[10px] text-blue-200">กติกา Peoria-DMN System (OUT 6 / IN 6)</p>
           </div>
-          <button onClick={onClose} className="text-slate-300 hover:text-white text-lg font-bold">✕</button>
+          <button onClick={onClose} className="text-slate-300 hover:text-white text-lg font-bold cursor-pointer">✕</button>
         </div>
 
         <div className="p-3 space-y-3 max-h-[80vh] overflow-y-auto">

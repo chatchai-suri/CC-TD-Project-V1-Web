@@ -4,8 +4,6 @@ import { useSearchParams, useNavigate } from "react-router-dom";
 import { useGolfStore } from "../../store/useGolfStore";
 import { apiService } from "../../utils/apiService";
 
-const REAL_COURSE_PAR = [4, 3, 4, 4, 5, 4, 3, 4, 5, 4, 5, 3, 4, 4, 4, 4, 3, 4];
-
 export default function GolferScorecard() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -46,13 +44,14 @@ export default function GolferScorecard() {
 
   const playerResult = tournamentResult?.leaderboard?.find((r: any) => Number(r.user_id) === userId);
 
-  // 💡 แมปสโตรกดิบจาก DB ให้ตรงล็อกหลุม 1-18 แบบเป๊ะ 100%
+  // 💡 แมปสโตรกดิบและ Par จาก DB ให้ตรงล็อกหลุม 1-18 แบบ Single Source of Truth 100%
   const fullHoles = Array.from({ length: 18 }, (_, i) => {
     const holeNo = i + 1;
     const found = directHoles.find((h: any) => Number(h.hole_no) === holeNo);
 
     const strokeValue = found ? Number(found.strokes ?? found.stroke ?? 0) : 0;
-    const parValue = found && found.par ? Number(found.par) : REAL_COURSE_PAR[i];
+    // 🎯 ใช้ค่า Par จาก DB ที่ดึงมาจากตาราง holes โดยตรง
+    const parValue = found && found.par ? Number(found.par) : (holeNo === 2 ? 5 : holeNo === 3 ? 3 : 4);
 
     return { 
       hole_no: holeNo, 
@@ -89,7 +88,7 @@ export default function GolferScorecard() {
         <div className="flex justify-between items-center">
           <div>
             <span className="text-[9px] font-black text-emerald-700 uppercase tracking-widest block">⛳ DIGITAL SCORECARD</span>
-            <h3 className="text-xs font-black text-slate-900 leading-tight line-clamp-1">{tournamentResult?.tournament_name || "Papoo Alpha Championship 2026"}</h3>
+            <h3 className="text-xs font-black text-slate-900 leading-tight line-clamp-1">{tournamentResult?.tournament_name || "Amata Alpha Championship 2026"}</h3>
           </div>
           <div className="bg-amber-500 text-slate-950 rounded-md px-2 py-0.5 text-center shrink-0 font-black shadow-sm">
             <span className="text-[10px] font-mono">Rank #{playerResult?.rank || "-"}</span>

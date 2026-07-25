@@ -54,13 +54,11 @@ export default function Login() {
           showConfirmButton: false,
         });
 
-        // 🔀 ดีดรถ นำทางพายูสเซอร์อพยพผ่านด่านสิทธิ์ข้ามมิติไปยังตารางทัวร์นาเมนต์หลักหรือแผงป้อนแต้มทันที[cite: 8]
-        if (role === "SCORER") {
-          navigate("/golfer/scoringPanel"); // ➡️ พา SCORER ตรงเข้าแผงคีย์แต้มสด
-        } else if (role === "TD" || role === "ADMIN") {
-          navigate("/td/flights"); // ➡️ พา TD ตรงเข้าหน้าจัดการก๊วน
+        // 🔀 นำทางพายูสเซอร์ทุกบทบาทอพยพไปยังตารางทัวร์นาเมนต์หลัก
+        if (role === "TD" || role === "ADMIN") {
+          navigate("/td/tournaments"); // ➡️ ฝั่งบริหารจัดการเข้าหน้าทัวร์นาเมนต์ TD
         } else {
-          navigate("/golfer/tournaments"); // ➡️ GOLFER ทั่วไปเข้าหน้าทัวร์นาเมนต์
+          navigate("/golfer/tournaments"); // ➡️ GOLFER และ SCORER เข้าหน้าทัวร์นาเมนต์สโมสร
         }
       }
     } catch (error: any) {

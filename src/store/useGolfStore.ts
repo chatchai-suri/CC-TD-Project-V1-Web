@@ -26,36 +26,37 @@ export const useGolfStore = create<any>((set: any, get: any) => ({
     try {
       const response = await apiService.post('/auth/login', credentials);
       const { data } = response.data;
-      set({ currentUser: data, isLoading: false });
+      console.log("✅ Login Success - Authenticated User Data:", data);
+      set({ currentUser: data, isLoading: false, error: null });
       return response.data;
-    } catch (error) {
-      console.warn("📢 ระบบสับวาล์วเข้าโหมด Offline Development");
-      const mockUserPayload = {
-        user_id: 23, 
-        username: credentials.username || "porn",
-        nickname: "คุณพร (TD)",
-        global_role: "TD" 
-      };
-      set({ currentUser: mockUserPayload, isLoading: false });
-      return { success: true, data: mockUserPayload };
+    } catch (error: any) {
+      console.error("❌ Login Failed - API Response Error:", error);
+      set({ currentUser: null, isLoading: false, error: error });
+      throw error;
     }
   },
   
-  // ⛳ Repositories
+  // ⛳ Repositories & Metadata Cache
   tournaments: [], 
   currentFlight: [], 
   userList: [],
   tournamentResult: null, 
+
+  // 🏛️ Master Metadata Caching (Static Course Specs)
+  courseHoles: [], // เก็บคลังข้อมูล 18 หลุม (hole_no, par, index)
+  activeTournamentId: null, // เก็บรหัสทัวร์นาเมนต์ปัจจุบันเพื่อคุม State Invalidation
 
   fetchTournaments: async () => {
     set({ isLoading: true, error: null });
     try {
       const response = await apiService.get('/user/tournaments');
       const fetchedData = response?.data?.data || response?.data || [];
+      console.log("⛳ Fetched Tournaments Data:", fetchedData);
       set({ tournaments: fetchedData, isLoading: false });
       return fetchedData;
     } catch (err: any) {
-      set({ tournaments: [], isLoading: false });
+      console.error("❌ Fetch Tournaments Error:", err);
+      set({ tournaments: [], isLoading: false, error: err });
       return [];
     }
   },
@@ -64,26 +65,16 @@ export const useGolfStore = create<any>((set: any, get: any) => ({
     try {
       const response = await apiService.get('/user/all');
       const users = response?.data?.data || response?.data || [];
+      console.log("👥 Fetched User List Data:", users);
       set({ userList: users });
       return users;
     } catch (error) {
-      const defaultUsers = [
-        { user_id: 14, username: "nobita", fullname: "Nobita Nobi" },
-        { user_id: 15, username: "shizuka", fullname: "Shizuka Minamoto" },
-        { user_id: 16, username: "gian", fullname: "Takeshi Goda (Gian)" },
-        { user_id: 17, username: "suneo", fullname: "Suneo Honekawa" },
-        { user_id: 18, username: "dekisugi", fullname: "Dekisugi Hidetoshi" },
-        { user_id: 19, username: "papoo_test", fullname: "Chatchai Suriyawan (Papoo)" },
-        { user_id: 20, username: "gemkung_test", fullname: "Gemini Gemkung" },
-        { user_id: 21, username: "bobby", fullname: "bob" },
-        { user_id: 22, username: "Peter", fullname: "pp" },
-        { user_id: 23, username: "porn", fullname: "porn (คุณพร TD)" }
-      ];
-      set({ userList: defaultUsers });
-      return defaultUsers;
+      console.error("❌ Fetch User List Error:", error);
+      set({ userList: [] });
+      return [];
     }
   },
-  
+
   fetchFlightDetails: async (tournamentId: string) => {
     set({ isLoading: true, error: null });
     try {
@@ -229,13 +220,9 @@ export const useGolfStore = create<any>((set: any, get: any) => ({
     }
   },
 
-  /**
-   * 🎯 Action ใหม่: บันทึกสโตรกคะแนนสดลงตาราง scores ใน MySQL
-   */
-saveFlightScores: async (flightId: number, scoresPayload: any[]) => {
+  saveFlightScores: async (flightId: number, scoresPayload: any[]) => {
     set({ isLoading: true });
     try {
-      // 🚀 RESTful Endpoint: POST /api/v1/scorer/scores
       const response = await apiService.post('/scorer/scores', {
         flight_id: flightId,
         scores: scoresPayload
@@ -244,7 +231,6 @@ saveFlightScores: async (flightId: number, scoresPayload: any[]) => {
       return response.data;
     } catch (error) {
       set({ isLoading: false });
-      console.warn("⚠️ API Score Record offline mode");
       throw error;
     }
   },
@@ -253,8 +239,18 @@ saveFlightScores: async (flightId: number, scoresPayload: any[]) => {
     set({ isLoading: true, error: null });
     try {
       const response = await apiService.get(`/user/tournament/${tournamentId}/leaderboard`);
-      set({ tournamentResult: response.data, isLoading: false });
-      return response.data;
+      
+      // 🎯 Metadata Caching Logic: ดึงและสลัก Master Holes ลง Store เมื่อได้ Response
+      const resultData = response.data;
+      if (resultData && Array.isArray(resultData.holes)) {
+        set({
+          courseHoles: resultData.holes,
+          activeTournamentId: tournamentId
+        });
+      }
+
+      set({ tournamentResult: resultData, isLoading: false });
+      return resultData;
     } catch (err: any) {
       set({ tournamentResult: null, isLoading: false, error: err });
       return null;
@@ -262,7 +258,15 @@ saveFlightScores: async (flightId: number, scoresPayload: any[]) => {
   },
 
   logout: () => {
-    set({ currentUser: null, tournaments: [], currentFlight: [], tournamentResult: null, userList: [] });
+    set({ 
+      currentUser: null, 
+      tournaments: [], 
+      currentFlight: [], 
+      tournamentResult: null, 
+      userList: [],
+      courseHoles: [],
+      activeTournamentId: null
+    });
   }
 
 }));
