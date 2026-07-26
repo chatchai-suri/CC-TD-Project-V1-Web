@@ -1,4 +1,3 @@
-// src/pages/golfer/GolferScorecard.tsx
 import { useEffect, useState } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { useGolfStore } from "../../store/useGolfStore";
@@ -67,6 +66,20 @@ export default function GolferScorecard() {
     return holesList.reduce((acc, curr) => acc + (Number(curr[field]) || 0), 0);
   };
 
+  /**
+   * 🎨 ฟังก์ชันกำหนดสีตัวเลขตามมาตรฐานสากล (Golf Scoring Standard Color Palette)
+   * Under Par (Birdie/Eagle) = สีเขียว
+   * Par = สีดำ
+   * Over Par (Bogey/Double Bogey) = สีแดง/ม่วง
+   */
+  const getCellScoreStyle = (stroke: number, par: number) => {
+    if (stroke === 0) return "text-slate-300 font-normal";
+    const diff = stroke - par;
+    if (diff < 0) return "bg-emerald-50 text-emerald-600 font-black"; // 🟢 Birdie/Eagle = เขียว
+    if (diff === 0) return "text-slate-900 font-bold";               // ⚪ Par = ดำ/เทา
+    return "bg-rose-50 text-rose-600 font-black";                    // 🔴 Bogey/Over Par = แดง
+  };
+
   return (
     <div className="w-full bg-white text-slate-900 font-sans p-1 text-[11px]">
       
@@ -133,9 +146,8 @@ export default function GolferScorecard() {
                   {outHoles.map((h: any, i: number) => {
                     const strokeVal = Number(h.stroke) || 0;
                     const parVal = Number(h.par) || 4;
-                    const diff = strokeVal ? strokeVal - parVal : 0;
-                    const cellBg = strokeVal === 0 ? "text-slate-300" : diff < 0 ? "bg-red-50 text-red-600 font-black" : diff > 0 ? "bg-blue-50 text-blue-600 font-black" : "text-slate-900 font-bold";
-                    return <td key={i} className={`border-r border-slate-200 py-1 ${cellBg}`}>{strokeVal || "-"}</td>;
+                    const cellStyle = getCellScoreStyle(strokeVal, parVal);
+                    return <td key={i} className={`border-r border-slate-200 py-1 ${cellStyle}`}>{strokeVal || "-"}</td>;
                   })}
                   <td className="bg-slate-900 text-yellow-400 font-black">{calculateTotal(outHoles, 'stroke') || playerResult?.out_gross}</td>
                 </tr>
@@ -166,9 +178,8 @@ export default function GolferScorecard() {
                   {inHoles.map((h: any, i: number) => {
                     const strokeVal = Number(h.stroke) || 0;
                     const parVal = Number(h.par) || 4;
-                    const diff = strokeVal ? strokeVal - parVal : 0;
-                    const cellBg = strokeVal === 0 ? "text-slate-300" : diff < 0 ? "bg-red-50 text-red-600 font-black" : diff > 0 ? "bg-blue-50 text-blue-600 font-black" : "text-slate-900 font-bold";
-                    return <td key={i} className={`border-r border-slate-200 py-1 ${cellBg}`}>{strokeVal || "-"}</td>;
+                    const cellStyle = getCellScoreStyle(strokeVal, parVal);
+                    return <td key={i} className={`border-r border-slate-200 py-1 ${cellStyle}`}>{strokeVal || "-"}</td>;
                   })}
                   <td className="bg-slate-900 text-yellow-400 font-black">{calculateTotal(inHoles, 'stroke') || playerResult?.in_gross}</td>
                 </tr>

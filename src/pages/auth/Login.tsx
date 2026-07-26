@@ -122,7 +122,7 @@ export default function Login() {
               type="text"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              placeholder="พิมพ์ชื่อโปรไฟล์ (เช่น nobita)"
+              placeholder="กรอกชื่อผู้ใช้งาน (Username) เช่น golfer01"
               className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:border-slate-900 focus:bg-white transition-colors"
               disabled={isLoading}
             />
