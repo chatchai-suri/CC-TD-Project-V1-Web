@@ -2,23 +2,36 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useGolfStore } from "../../store/useGolfStore";
-import Swal from "sweetalert2"; // 🛡️ นำเข้าขุมพลังกล่องข้อความพรีเมียมส่วนกลางสโมสร[cite: 9]
+import Swal from "sweetalert2"; // 🛡️ นำเข้าขุมพลังกล่องข้อความพรีเมียมส่วนกลางสโมสร
 
 /**
  * 🎯 วัตถุประสงค์: หน้าจอเข้าสู่ระบบอัจฉริยะ (Hybrid Failback Login Screen)
  * @description ออกแบบโครงสร้างรองรับ Virtual Keyboard บน iPhone SE โดยปล่อยระนาบเนื้อหายืดดิ่งธรรมชาติ[cite: 14]
- * @param credentials วัตถุข้อมูลรหัสผ่าน { username, password } ส่งเข้าตู้ Zustand store[cite: 1]
+ * @param credentials วัตถุข้อมูลรหัสผ่าน { username, password } ส่งเข้าตู้ Zustand store[cite: 14]
  */
 export default function Login() {
   const navigate = useNavigate();
   
-  // 🧠 ดึง Action ล็อกอินหลัก และสเตตัสการโหลดมาจากสมองกลกลาง Zustand[cite: 1]
+  // 🧠 ดึง Action ล็อกอินหลัก และสเตตัสการโหลดมาจากสมองกลกลาง Zustand[cite: 14]
   const loginGolfer = useGolfStore((state: any) => state.loginGolfer);
   const isLoading = useGolfStore((state: any) => state.isLoading);
 
   // 📥 ตัวแปร Local State สำหรับแกะรอยการพิมพ์ช่อง Input ในสมาร์ทโฟน
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+
+  /**
+   * 🎯 วัตถุประสงค์: แปลงรหัสสิทธิ์ภาษาอังกฤษให้เป็นชื่อป้ายภาษาไทยที่อ่านง่าย นุ่มนวล
+   */
+  const getRoleThaiName = (role: string) => {
+    switch (role) {
+      case "ADMIN": return "ผู้ดูแลระบบสูงสุด";
+      case "TD": return "ผู้จัดการแข่งขัน (TD)";
+      case "SCORER": return "ผู้บันทึกคะแนนสนาม";
+      case "GOLFER": return "นักกอล์ฟสมาชิก";
+      default: return "ผู้ใช้งานทั่วไป";
+    }
+  };
 
   /**
    * 🎯 วัตถุประสงค์: ดักจับคำสั่งการส่งฟอร์มล็อกอิน และประมวลผลระบบหนีไฟกรณีสัญญาณเครือข่ายล่ม
@@ -38,31 +51,35 @@ export default function Login() {
     }
 
     try {
-      // 🚀 ส่งกระแสคำสั่งมุดอุโมงค์เข้าหาคลังสมองกล Zustand store ข้ามอุปกรณ์[cite: 1]
+      // 🚀 ส่งกระแสคำสั่งมุดอุโมงค์เข้าหาคลังสมองกล Zustand store ข้ามอุปกรณ์[cite: 14]
       const result = await loginGolfer({ username, password });
 
       if (result?.success) {
-        // 🎯 ดึงสิทธิ์ที่เพิ่งล็อกอินสำเร็จเพื่อกำหนดทางเดินรถให้ตรงตาม Matrix R3
-        const role = result?.user?.global_role || result?.data?.global_role;
+        // 🎯 แกะข้อมูลผู้ใช้จริงจาก Response[cite: 14]
+        const userData = result?.user || result?.data || {};
+        const role = userData?.global_role || "GOLFER";
+        const fullName = userData?.fullname || username;
+        const nickName = userData?.nickname ? ` (${userData.nickname})` : "";
+        const roleThai = getRoleThaiName(role);
 
-        // ปลุกเสกกล่องความสำเร็จขนาดกะทัดรัดความไวสูง[cite: 8]
+        // 🌟 ทางเลือก 2: ปลุกเสกกล่องความสำเร็จ แสดงชื่อผู้เล่น + สิทธิ์ ไร้ Hardcode[cite: 14]
         Swal.fire({
           icon: "success",
-          title: "ยืนยันสิทธิ์สำเร็จ",
-          text: `ยินดีต้อนรับเข้าสู่ระบบกอล์ฟ-TD ครับป๋าปู!`,
-          timer: 1500,
+          title: `ยินดีต้อนรับครับคุณ ${fullName}${nickName}`,
+          text: `เข้าสู่ระบบในสิทธิ์ "${roleThai}" เรียบร้อยแล้วครับ! ⛳`,
+          timer: 2000,
           showConfirmButton: false,
         });
 
-        // 🔀 นำทางพายูสเซอร์ทุกบทบาทอพยพไปยังตารางทัวร์นาเมนต์หลัก
+        // 🔀 นำทางพายูสเซอร์ทุกบทบาทอพยพไปยังตารางทัวร์นาเมนต์หลัก[cite: 14]
         if (role === "TD" || role === "ADMIN") {
-          navigate("/td/tournaments"); // ➡️ ฝั่งบริหารจัดการเข้าหน้าทัวร์นาเมนต์ TD
+          navigate("/td/tournaments"); // ➡️ ฝั่งบริหารจัดการเข้าหน้าทัวร์นาเมนต์ TD[cite: 14]
         } else {
-          navigate("/golfer/tournaments"); // ➡️ GOLFER และ SCORER เข้าหน้าทัวร์นาเมนต์สโมสร
+          navigate("/golfer/tournaments"); // ➡️ GOLFER และ SCORER เข้าหน้าทัวร์นาเมนต์สโมสร[cite: 14]
         }
       }
     } catch (error: any) {
-      // 🛡️ ด่านที่ 2: ระบบบริหารจัดการข้อผิดพลาดกรณีเกิด Error จริงหลังบ้าน (Error Handling Integration)
+      // 🛡️ ด่านที่ 2: ระบบบริหารจัดการข้อผิดพลาดกรณีเกิด Error จริงหลังบ้าน (Error Handling Integration)[cite: 14]
       console.error("📢 ตรวจพบสัญญาณขัดข้องฝั่งด่านหน้า:", error);
       
       Swal.fire({
@@ -75,7 +92,7 @@ export default function Login() {
   };
 
   return (
-    // 📱 ใช้กฎระเบียบคุมมิติหน้าจอ: ปล่อยเนื้อหายืดดิ่งอิสระ Window Scroll คอนฟิกรองรับ Virtual Keyboard[cite: 14]
+    // 📱 ใช้กฎระเบียบคุมมิติหน้าจอ: ปล่อยเนื้อหายืดดิ่งอิสระ Window Scroll คอนฟิกรองรับ Virtual Keyboard[cite: 14, 16]
     <div className="w-full min-h-screen bg-slate-50 text-slate-900 font-sans flex flex-col justify-start items-center p-4 pt-12">
       
       {/* โลโก้ตรายางสโมสรจัดวางเยื้องตำแหน่งบนสุด[cite: 14] */}
@@ -150,7 +167,7 @@ export default function Login() {
       {/* แถบแจ้งเตือนระดับวินัยความเสถียรใต้กล่องฟอร์ม */}
       <div className="mt-4 max-w-sm text-center">
         <p className="text-[10px] text-slate-400 italic">
-          * ระบบสวมเกราะ High-Stability Hybrid Failback Ready[cite: 1] หาก pp1 ขาดการเชื่อมต่อ ระบบจะปลดล็อก Persona ออฟไลน์ให้ลุยงานต่อทันทีครับป๋าปู![cite: 1]
+          * ระบบสวมเกราะ High-Stability Hybrid Failback Ready[cite: 14] หาก pp1 ขาดการเชื่อมต่อ ระบบจะปลดล็อก Persona ออฟไลน์ให้ลุยงานต่อทันทีครับป๋าปู![cite: 14]
         </p>
       </div>
 
