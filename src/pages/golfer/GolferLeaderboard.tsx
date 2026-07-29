@@ -2,8 +2,9 @@
 import { useEffect, useState } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { useGolfStore } from "../../store/useGolfStore";
-import PeoriaModal from "../../components/PeoriaModal";
+import PeoriaModal from "../../components/td/PeoriaModal";
 import { apiService } from "../../utils/apiService";
+import { STATUS_STYLES } from "../../utils/statusStyles";
 import Swal from "sweetalert2";
 
 export default function GolferLeaderboard() {
@@ -29,8 +30,22 @@ export default function GolferLeaderboard() {
   const matchStatus = (tournamentResult?.status || searchParams.get("status") || "live").toLowerCase();
   const isLiveMode = matchStatus === "live";
   
+  // 🟢 ตรวจสอบกติกาแมตช์ว่าเป็น NO-HD (Gross Only) หรือไม่
+  const rawMode = (tournamentResult?.tournament_mode || tournamentResult?.handicap_rule || "").toUpperCase();
+  const isNoHdMode = rawMode.includes("NO-HD") || rawMode.includes("NO_HD") || rawMode.includes("GROSS");
+
   const displayLeaderboard = tournamentResult?.leaderboard || [];
   const userRole = currentUser?.global_role || "GUEST";
+
+  // 🔀 ฟังก์ชันสมองกลนำทางขากลับตามบทบาทจริง
+  const handleReturnToTournaments = () => {
+    const globalRole = currentUser?.global_role || currentUser?.role || "GUEST";
+    if (globalRole === "TD" || globalRole === "ADMIN") {
+      navigate("/td/tournaments");
+    } else {
+      navigate("/golfer/tournaments");
+    }
+  };
 
   const handlePlayerClick = (userId: number, playerName: string) => {
     const currentRole = currentUser?.global_role || "GUEST"; 
@@ -53,7 +68,9 @@ export default function GolferLeaderboard() {
         await Swal.fire({
           icon: 'success',
           title: '🏆 ปิดแมตช์การแข่งขันสำเร็จ!',
-          text: 'ระบบคำนวณแต้มต่อ Peoria-DMN และสลักอันดับ Net/HD เรียบร้อยแล้วครับ!',
+          text: isNoHdMode 
+            ? 'ระบบสรุปผลอันดับตามคะแนนดิบ (Gross Only) เรียบร้อยแล้วครับ!' 
+            : 'ระบบคำนวณแต้มต่อ Peoria-DMN และสลักอันดับ Net/HD เรียบร้อยแล้วครับ!',
           timer: 2000,
           showConfirmButton: false
         });
@@ -77,13 +94,13 @@ export default function GolferLeaderboard() {
       {/* ส่วนหัวป้ายนำทาง */}
       <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
         <button
-          onClick={() => navigate("/golfer/tournaments")}
+          onClick={handleReturnToTournaments}
           className="inline-flex items-center gap-1 text-xs font-semibold text-blue-600 hover:text-blue-800 transition-colors cursor-pointer"
         >
           ⬅️ กลับไปตารางแข่ง
         </button>
-        <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
-          isLiveMode ? "bg-red-500 text-white animate-pulse" : "bg-emerald-600 text-white"
+        <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border ${
+          isLiveMode ? STATUS_STYLES.live.badge : STATUS_STYLES.final.badge
         }`}>
           {isLiveMode ? "⚡ LIVE SCORE" : "🏆 FINAL SCORE"}
         </span>
@@ -97,22 +114,51 @@ export default function GolferLeaderboard() {
               <span>👑</span> แผงควบคุมสโมสร (TD Control)
             </span>
             <span className="text-[10px] text-amber-700 block mt-0.5">
-              คะแนนครบแล้ว พร้อมจับฉลากหลุมลับคิดแต้มต่อ Peoria-DMN
+              {isNoHdMode 
+                ? "กติกา Gross Only (NO-HD): สรุปผลคะแนนดิบและปิดแมตช์การแข่งขัน" 
+                : "คะแนนครบแล้ว พร้อมจับฉลากหลุมลับคิดแต้มต่อ Peoria-DMN"}
             </span>
           </div>
-          <button
-            onClick={() => setIsPeoriaModalOpen(true)}
-            className="px-3 py-1.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-xs rounded-xl shadow-md transition-all active:scale-95 cursor-pointer flex items-center gap-1 shrink-0"
-          >
-            <span>🎲</span> สุ่มหลุมลับ
-          </button>
+
+          {isNoHdMode ? (
+            /* 🟢 ปุ่มปิดแมตช์ตรงสำหรับกติกา NO-HD */
+            <button
+              onClick={async () => {
+                const result = await Swal.fire({
+                  title: "ยืนยันปิดแมตช์แข่งขัน?",
+                  text: "กติกา NO-HD (Gross Only) จะสรุปผลอันดับตามคะแนนดิบจริงทันที",
+                  icon: "warning",
+                  showCancelButton: true,
+                  confirmButtonText: "🏆 ปิดแมตช์ทันที",
+                  cancelButtonText: "ยกเลิก",
+                  confirmButtonColor: "#059669"
+                });
+                if (result.isConfirmed) {
+                  handleCloseTournament([]);
+                }
+              }}
+              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow-md transition-all active:scale-95 cursor-pointer flex items-center gap-1 shrink-0"
+            >
+              <span>🏆</span> ปิดแมตช์ (NO-HD)
+            </button>
+          ) : (
+            /* 🎲 ปุ่มสุ่มหลุมลับสำหรับกติกา Peoria */
+            <button
+              onClick={() => setIsPeoriaModalOpen(true)}
+              className="px-3 py-1.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-xs rounded-xl shadow-md transition-all active:scale-95 cursor-pointer flex items-center gap-1 shrink-0"
+            >
+              <span>🎲</span> สุ่มหลุมลับ
+            </button>
+          )}
         </div>
       )}
 
+      {/* 🎯 เชื่อมต่อ PeoriaModal พร้อมส่ง Props ครบถ้วน */}
       <PeoriaModal
         isOpen={isPeoriaModalOpen}
         onClose={() => setIsPeoriaModalOpen(false)}
-        onSubmit={handleCloseTournament}
+        tournament={tournamentResult}
+        onConfirmCloseMatch={handleCloseTournament}
       />
 
       {/* บล็อกหัวเรื่องภาพรวมแมตช์ */}
@@ -126,20 +172,24 @@ export default function GolferLeaderboard() {
           <span>📅 2026-07-23</span>
         </p>
         
-        {/* กล่องเฉลยหลุมลับ */}
-        <div className={`mt-2 p-2 rounded-lg border text-left ${isLiveMode ? "bg-slate-50 border-slate-200" : "bg-amber-50 border-amber-200"}`}>
-          <p className={`text-[10px] font-bold ${isLiveMode ? "text-slate-500" : "text-amber-800"}`}>
-            {isLiveMode ? "🔒 หลุมลับประมวลผล Peoria จะแสดงเมื่อสถานะการแข่งขันจบรอบลงตัว" : "🔍 รายชื่อหลุมลับ Peoria จากฉลากปาร์ตี้เลี้ยงฉลอง"}
-          </p>
-          <p className="text-xs font-black text-slate-950 mt-0.5 tracking-widest">
-            ⛳ หลุมลับ: [ <span className={isLiveMode ? "text-slate-400 font-medium" : "text-amber-900 font-black"}>{tournamentResult?.peoria_hidden_holes || (isLiveMode ? "??, ??, ??, ??, ??, ??" : "1, 3, 5, 11, 14, 16")}</span> ]
-          </p>
-        </div>
+        {/* กล่องเฉลยหลุมลับ (แสดงเฉพาะกติกาที่ใช้ Peoria / มีแต้มต่อ) */}
+        {!isNoHdMode && (
+          <div className={`mt-2 p-2 rounded-lg border text-left ${isLiveMode ? "bg-slate-50 border-slate-200" : "bg-amber-50 border-amber-200"}`}>
+            <p className={`text-[10px] font-bold ${isLiveMode ? "text-slate-500" : "text-amber-800"}`}>
+              {isLiveMode ? "🔒 หลุมลับประมวลผล Peoria จะแสดงเมื่อสถานะการแข่งขันจบรอบลงตัว" : "🔍 รายชื่อหลุมลับ Peoria จากฉลากปาร์ตี้เลี้ยงฉลอง"}
+            </p>
+            <p className="text-xs font-black text-slate-950 mt-0.5 tracking-widest">
+              ⛳ หลุมลับ: [ <span className={isLiveMode ? "text-slate-400 font-medium" : "text-amber-900 font-black"}>{tournamentResult?.peoria_hidden_holes || (isLiveMode ? "??, ??, ??, ??, ??, ??" : "1, 3, 5, 11, 14, 16")}</span> ]
+            </p>
+          </div>
+        )}
 
         <div className="mt-2 flex flex-wrap gap-2 text-[10px] bg-slate-50 p-2 rounded-lg border border-slate-100">
-          <span className="text-slate-600 font-medium">⛳ Par: <strong className="text-slate-950 font-bold">{tournamentResult?.par || 71}</strong></span>
+          <span className="text-slate-600 font-medium">⛳ Par: <strong className="text-slate-950 font-bold">{tournamentResult?.par || 72}</strong></span>
           <span className="text-slate-300">|</span>
-          <span className="text-slate-600 font-medium">📋 Rule: <strong className="text-slate-950 font-bold">{tournamentResult?.handicap_rule || "Peoria-DMN System"}</strong></span>
+          <span className="text-slate-600 font-medium">📋 Rule: <strong className="text-slate-950 font-bold">
+            {isNoHdMode ? "Gross Only (NO-HD)" : (tournamentResult?.handicap_rule || tournamentResult?.tournament_mode || "Peoria-DMN System")}
+          </strong></span>
         </div>
       </div>
 
@@ -236,7 +286,9 @@ export default function GolferLeaderboard() {
       )}
 
       <p className="text-[10px] text-slate-400 text-center mt-4 italic">
-        * ระบบคำนวณแต้มต่อ Peoria-DMN (Double Morihiro Naoki) สลักผลทางการ
+        {isNoHdMode 
+          ? "* ระบบประมวลผลกติกา Gross Only (ไม่มีแต้มต่อ) สลักผลทางการ"
+          : "* ระบบคำนวณแต้มต่อ Peoria-DMN (Double Morihiro Naoki) สลักผลทางการ"}
       </p>
 
     </div>

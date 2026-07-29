@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { useGolfStore } from "../../store/useGolfStore";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { STATUS_STYLES, PRIMARY_BTN_STYLE } from "../../utils/statusStyles";
 import Swal from "sweetalert2";
 
 /**
@@ -69,8 +70,13 @@ export default function ScoringPanel() {
         const uId = p.user_id;
         const userSavedScores = p.user?.scores || p.scores || [];
         
+        // 🟢 กรองคะแนนเฉพาะของ flight_id ปัจจุบันเท่านั้น (ป้องกันแต้มข้ามแมตช์/ก๊วนหลุดมาปน)
+        const currentFlightScores = userSavedScores.filter((s: any) => 
+          Number(s.flight_id) === Number(activeFlightId)
+        );
+
         const scoreMap = new Map<number, number>();
-        userSavedScores.forEach((s: any) => {
+        currentFlightScores.forEach((s: any) => {
           const hNo = s.hole?.hole_no || s.hole_no;
           if (hNo) scoreMap.set(Number(hNo), Number(s.strokes));
         });
@@ -95,7 +101,7 @@ export default function ScoringPanel() {
         setSelectedPlayerId(currentUser?.user_id || activeMembers[0]?.user_id);
       }
     }
-  }, [activeFlight, activeMembers, currentUser, courseHoles, tournamentResult]);
+  }, [activeFlight, activeMembers, currentUser, courseHoles, tournamentResult, activeFlightId]);
 
   const activePlayerScores = selectedPlayerId ? flightScoresRepo[selectedPlayerId] || [] : [];
   const currentActiveHole = activePlayerScores.find(h => h.hole_no === selectedHoleNo);
@@ -237,7 +243,7 @@ export default function ScoringPanel() {
             <h3 className="text-xs font-black text-slate-950 leading-tight line-clamp-1">{tournamentResult?.tournament_name || "Amata Alpha Championship 2026"}</h3>
             <p className="text-[10px] text-slate-500 font-medium mt-0.5">📍 Amata Spring Country Club</p>
           </div>
-          <span className="text-[9px] bg-red-500 text-white font-black px-1.5 py-0.5 rounded animate-pulse">LIVE SCORE</span>
+          <span className={`text-[9px] px-1.5 py-0.5 rounded border ${STATUS_STYLES.live.badge}`}>LIVE SCORE</span>
         </div>
       </div>
 
@@ -396,12 +402,13 @@ export default function ScoringPanel() {
           </table>
         </div>
 
+        {/* ปุ่มบันทึกคะแนนก๊วน (ดึงสไตล์จาก PRIMARY_BTN_STYLE) */}
         {!isReadOnlyMode && (
           <div className="pt-0.5 shrink-0">
             <button
               onClick={handleSaveAction}
               disabled={isLoading}
-              className="w-full py-2.5 rounded-xl font-black text-xs shadow-md bg-purple-600 hover:bg-purple-700 text-white cursor-pointer active:scale-95 transition-all"
+              className={`w-full py-2.5 rounded-xl text-xs cursor-pointer ${PRIMARY_BTN_STYLE}`}
             >
               💾 ยืนยันบันทึกคะแนนก๊วนลงระบบ
             </button>

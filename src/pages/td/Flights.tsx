@@ -149,6 +149,18 @@ function Flights() {
     });
   };
 
+  // 🎯 ฟังก์ชันช่วยเปิด Modal พร้อมดึงคลังยูสเซอร์สดๆ จาก DB
+  const handleOpenUserModal = async (currentFlightId: any, pUserId: number) => {
+    setActiveSelectTarget({
+      flightId: currentFlightId,
+      targetUserId: pUserId,
+    });
+    if (fetchUserList) {
+      await fetchUserList(); // 👈 บังคับรอให้ API ดึงคลังนักกอล์ฟเสร็จ 100% ก่อนเปิด Modal
+    }
+    setIsModalOpen(true);
+  };
+
   return (
     <div className="w-full bg-white text-slate-900 font-sans p-1 text-[11px] max-h-[640px] flex flex-col overflow-hidden">
       {/* แถวควบคุมย้อนกลับระดับสิทธิ์ TD */}
@@ -242,7 +254,8 @@ function Flights() {
                     const pName =
                       p.user?.fullname || p.name || "คลิกเลือกรายชื่อ...";
                     const pUserId = p.user_id;
-                    const pRole = p.role || "GOLFER";
+                    const pRole = String(p.role || "GOLFER").toUpperCase();
+                    const isScorer = pRole === "SCORER";
                     const pHd =
                       p.handicap_claim !== undefined
                         ? p.handicap_claim
@@ -261,13 +274,7 @@ function Flights() {
 
                             {/* กล่องเลือกนักกอล์ฟ - จิ้มเพื่อเปิด Modal ดึงยูสเซอร์จาก DB */}
                             <div
-                              onClick={() => {
-                                setActiveSelectTarget({
-                                  flightId: currentFlightId,
-                                  targetUserId: pUserId,
-                                });
-                                setIsModalOpen(true);
-                              }}
+                              onClick={() => handleOpenUserModal(currentFlightId, pUserId)}
                               className="px-2 py-1 text-[11px] border border-slate-200 rounded-md bg-slate-50 font-black text-slate-800 w-32 max-w-[130px] cursor-pointer truncate shadow-inner hover:bg-amber-50 hover:border-amber-300 transition-all"
                             >
                               🏌️‍♂️ {pName}
@@ -275,23 +282,28 @@ function Flights() {
                           </div>
 
                           <div className="flex items-center gap-1 shrink-0">
-                            {/* สลับบทบาท GOLFER / SCORER */}
-                            <select
-                              value={pRole}
-                              onChange={(e) =>
-                                updatePlayerField &&
-                                updatePlayerField(
-                                  currentFlightId,
-                                  pUserId,
-                                  "role",
-                                  e.target.value
-                                )
-                              }
-                              className="px-1 py-1 text-[10px] border border-slate-200 rounded-md bg-white font-black text-slate-700 cursor-pointer focus:outline-none"
+                            {/* 🎯 สลับบทบาท GOLFER / SCORER สไตล์ Custom Toggle Button */}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const nextRole = isScorer ? "GOLFER" : "SCORER";
+                                if (updatePlayerField) {
+                                  updatePlayerField(
+                                    currentFlightId,
+                                    pUserId,
+                                    "role",
+                                    nextRole
+                                  );
+                                }
+                              }}
+                              className={`px-2 py-1 text-[9px] rounded-md font-black tracking-tight transition-all cursor-pointer border flex items-center gap-1 shadow-xs active:scale-95 ${
+                                isScorer
+                                  ? "bg-purple-600 text-white border-purple-500 shadow-sm"
+                                  : "bg-slate-100 hover:bg-slate-200 text-slate-600 border-slate-200"
+                              }`}
                             >
-                              <option value="GOLFER">GOLFER</option>
-                              <option value="SCORER">SCORER</option>
-                            </select>
+                              <span>{isScorer ? "✍️ SCORER" : "🏌️‍♂️ GOLFER"}</span>
+                            </button>
 
                             {/* ปุ่มลบผู้เล่นออกจากก๊วน */}
                             <button
@@ -360,13 +372,13 @@ function Flights() {
         </div>
       </div>
 
-{/* 📋 MODAL WINDOW: ดึงรายชื่อประชากรจากตู้ DB (พร้อมระบบดักจับไม่ให้เลือกคนซ้ำข้ามก๊วน) */}
+      {/* 📋 MODAL WINDOW: แสดงเฉพาะรายชื่อที่ยังไม่ได้จัดลงก๊วน (Flight Omit Filter) */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-fade-in">
           <div className="bg-white rounded-2xl max-w-xs w-full p-4 shadow-2xl border border-slate-100">
             <div className="flex justify-between items-center mb-3 border-b pb-2">
               <h3 className="text-xs font-black text-slate-900">
-                📋 เลือกรายชื่อนักกอล์ฟจากตู้ DB
+                📋 เลือกรายชื่อนักกอล์ฟ (เฉพาะผู้ที่ยังไม่มีก๊วน)
               </h3>
               <button
                 onClick={() => setIsModalOpen(false)}
@@ -377,31 +389,44 @@ function Flights() {
             </div>
 
             <div className="space-y-1.5 max-h-56 overflow-y-auto pr-0.5 scrollbar-thin">
-              {userList.map((user: any) => {
-                // 🛡️ ด่านตรวจ: เช็กว่า user_id นี้ถูกจัดลงก๊วนใดก๊วนหนึ่งในทัวร์นาเมนต์นี้ไปแล้วหรือยัง?
-                const isAlreadySelected = flights.some((f: any) =>
-                  (f.members || f.players || []).some(
-                    (m: any) => m.user_id === user.user_id
-                  )
+              {(() => {
+                // 🛡️ Flight Omit Filter: รวบรวม user_id ของสมาชิกที่มีก๊วนอยู่แล้วในปัจจุบัน
+                const assignedUserIds = new Set<number>();
+                flights.forEach((f: any) => {
+                  (f.members || f.players || []).forEach((m: any) => {
+                    if (typeof m.user_id === 'number' && m.user_id < 1000000000000) {
+                      assignedUserIds.add(Number(m.user_id));
+                    }
+                  });
+                });
+
+                // 🎯 Omit Filter: ตัดคนที่มีก๊วนออก เหลือเฉพาะคนที่ว่างจาก DB
+                const availableUsers = userList.filter(
+                  (u: any) => !assignedUserIds.has(Number(u.user_id))
                 );
 
-                return (
+                if (availableUsers.length === 0) {
+                  return (
+                    <div className="py-6 text-center text-slate-400 space-y-1">
+                      <p className="text-xs font-bold">🎉 จัดนักกอล์ฟลงก๊วนครบทุกคนแล้ว!</p>
+                      <p className="text-[10px]">ไม่มีรายชื่อตกค้างในคลัง DB</p>
+                    </div>
+                  );
+                }
+
+                return availableUsers.map((user: any) => (
                   <div
                     key={user.user_id}
-                    onClick={() => !isAlreadySelected && handleSelectPlayer(user)}
-                    className={`p-2 border rounded-xl text-[11px] font-black transition-all text-left flex justify-between items-center ${
-                      isAlreadySelected
-                        ? "bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed opacity-60" // 🚫 ซ่อนสิทธิ์คนซ้ำเป็นสีเทา
-                        : "bg-slate-50 border-slate-100 text-slate-800 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-300 cursor-pointer"
-                    }`}
+                    onClick={() => handleSelectPlayer(user)}
+                    className="p-2 border rounded-xl text-[11px] font-black transition-all text-left flex justify-between items-center bg-slate-50 border-slate-100 text-slate-800 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-300 cursor-pointer"
                   >
                     <span>🏌️‍♂️ {user.fullname || user.username}</span>
-                    <span className="text-[9px] font-mono">
-                      {isAlreadySelected ? "⛔ เลือกแล้ว" : `ID: ${user.user_id}`}
+                    <span className="text-[9px] font-mono text-emerald-600">
+                      ID: {user.user_id}
                     </span>
                   </div>
-                );
-              })}
+                ));
+              })()}
             </div>
           </div>
         </div>

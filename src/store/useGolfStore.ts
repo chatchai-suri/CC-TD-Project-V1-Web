@@ -1,6 +1,7 @@
 // src/store/useGolfStore.ts
 import { create } from "zustand";
 import { apiService } from "../utils/apiService";
+import Swal from "sweetalert2";
 
 export const useGolfStore = create<any>((set: any, get: any) => ({
 
@@ -61,26 +62,36 @@ export const useGolfStore = create<any>((set: any, get: any) => ({
     }
   },
 
-  fetchUserList: async () => {
+fetchUserList: async () => {
     try {
       const response = await apiService.get('/user/all');
-      const users = response?.data?.data || response?.data || [];
-      console.log("👥 Fetched User List Data:", users);
+      const users = response?.data?.data || [];
+      console.log("👥 [API Real Integration] Fetched Users Success:", users);
       set({ userList: users });
       return users;
     } catch (error) {
-      console.error("❌ Fetch User List Error:", error);
+      console.error("❌ Fetch User List Failed:", error);
       set({ userList: [] });
       return [];
     }
   },
 
-  fetchFlightDetails: async (tournamentId: string) => {
+fetchFlightDetails: async (tournamentId: string) => {
     set({ isLoading: true, error: null });
     try {
       const response = await apiService.get(`/td/tournaments/${tournamentId}/flights`);
       const flightData = response?.data?.data || response?.data || [];
-      set({ currentFlight: flightData, isLoading: false });
+      
+      // 🎯 Auto-Sync Role Normalize: ดึง role จาก flight_member หรือ fallback ไปที่ global_role ของ user
+      const normalizedFlights = flightData.map((f: any) => ({
+        ...f,
+        members: (f.members || []).map((m: any) => ({
+          ...m,
+          role: (m.role || m.user?.global_role || "GOLFER").toUpperCase()
+        }))
+      }));
+
+      set({ currentFlight: normalizedFlights, isLoading: false });
     } catch (error: any) {
       set({ currentFlight: [], isLoading: false });
     }
@@ -120,12 +131,18 @@ export const useGolfStore = create<any>((set: any, get: any) => ({
     set({ currentFlight: updated });
   },
 
+  // ⛳ Action ปรับอัปเดตข้อมูลผู้เล่นใน Flight (พร้อมระบบ Single Scorer Guard Clause)
   updatePlayerField: (flightId: any, targetUserId: number, field: string, value: any) => {
     const { currentFlight } = get();
     const updated = currentFlight.map((f: any) => {
       const fId = f.flight_id || f.id;
       if (fId === flightId) {
         const currentMembers = f.members || f.players || [];
+        
+        // 🛡️ Single Scorer Guard: หากสั่งตั้งค่า field "role" เป็น "SCORER"
+        // ให้สลับทุกคนในก๊วนนั้นกลับเป็น "GOLFER" ก่อน แล้วค่อยสลัก "SCORER" ให้ targetUserId
+        const isPromotingScorer = field === "role" && value === "SCORER";
+
         const updatedMembers = currentMembers.map((m: any) => {
           if (m.user_id === targetUserId) {
             if (field === "user_id") {
@@ -135,6 +152,12 @@ export const useGolfStore = create<any>((set: any, get: any) => ({
             if (field === "handicap") return { ...m, handicap_claim: value };
             return { ...m, [field]: value };
           }
+          
+          // 🛡️ ถ้ามีคนอื่นพยายามเป็น SCORER เพิ่มในก๊วนเดียวกัน ให้ปลดสิทธิ์คนเก่ากลับเป็น GOLFER ทันที
+          if (isPromotingScorer && (m.role === "SCORER" || m.role === "scorer")) {
+            return { ...m, role: "GOLFER" };
+          }
+
           return m;
         });
         return { ...f, members: updatedMembers };
@@ -267,6 +290,141 @@ export const useGolfStore = create<any>((set: any, get: any) => ({
       courseHoles: [],
       activeTournamentId: null
     });
+  },
+
+  // 🟢 Action สำหรับสลับสถานะแมตช์ (Hybrid Offline/Online Status Switching)
+  updateMatchStatus: async (tournamentId: string | number, newStatus: string) => {
+  const { tournaments } = get();
+  
+  // 1. Update State ใน Zustand ทันทีเพื่อความเร็วหน้าจอ (Optimistic UI)
+  const updatedTournaments = tournaments.map((t: any) => {
+    const tId = t.tournament_id || t.id;
+    if (String(tId) === String(tournamentId)) {
+      return { ...t, status: newStatus };
+    }
+    return t;
+  });
+  set({ tournaments: updatedTournaments });
+
+  // 2. ยิง API ลง MySQL หลังบ้าน (ถ้า Offline จะ Fallback เงียบๆ ไม่ทำระบบล่ม)
+  try {
+    const response = await apiService.patch(`/td/tournaments/${tournamentId}/status`, {
+      status: newStatus
+    });
+    console.log("✅ Match Status Updated in DB:", response.data);
+    return { success: true };
+  } catch (error) {
+    console.warn("⚠️ API Unavailable - Running in Offline/Dev Mode:", error);
+    return { success: true, offline: true };
   }
+  },
+
+  // (เพิ่ม Action fetchCourseHoles สำหรับ Caching Master Holes)
+  fetchCourseHoles: async (courseId: number | string) => {
+    if (!courseId) return;
+    try {
+      const res = await apiService.get(`/user/courses/${courseId}/holes`);
+      if (res.data && res.data.success && Array.isArray(res.data.holes)) {
+        set({ courseHoles: res.data.holes });
+      }
+    } catch (err: any) {
+      console.error("❌ Failed to hydrate Master Course Holes from DB:", err);
+    }
+  },
+
+  // เพิ่มใน createStore implementation:
+createTournament: async (data: any) => {
+  try {
+    const res = await apiService.post("/td/tournaments", data);
+    if (res.data.success) {
+      Swal.fire({
+        title: "สำเร็จ!",
+        text: "สร้างรายการแข่งขันใหม่เรียบร้อยแล้ว",
+        icon: "success",
+        timer: 1500,
+        showConfirmButton: false,
+        background: "#0f172a",
+        color: "#fff",
+      });
+      // Refresh รายชื่อแมตช์
+      get().fetchTournaments();
+    }
+  } catch (error: any) {
+    Swal.fire({
+      title: "ผิดพลาด!",
+      text: error.response?.data?.message || "ไม่สามารถสร้างรายการแข่งขันได้",
+      icon: "error",
+      background: "#0f172a",
+      color: "#fff",
+    });
+  }
+},
+
+updateTournament: async (id: number, data: any) => {
+  try {
+    const res = await apiService.put(`/td/tournaments/${id}`, data);
+    if (res.data.success) {
+      Swal.fire({
+        title: "สำเร็จ!",
+        text: "อัปเดตข้อมูลรายการแข่งขันเรียบร้อยแล้ว",
+        icon: "success",
+        timer: 1500,
+        showConfirmButton: false,
+        background: "#0f172a",
+        color: "#fff",
+      });
+      get().fetchTournaments();
+    }
+  } catch (error: any) {
+    Swal.fire({
+      title: "ผิดพลาด!",
+      text: error.response?.data?.message || "ไม่สามารถแก้ไขรายการแข่งขันได้",
+      icon: "error",
+      background: "#0f172a",
+      color: "#fff",
+    });
+  }
+},
+
+deleteTournament: async (id: number) => {
+  try {
+    const res = await apiService.delete(`/td/tournaments/${id}`);
+    if (res.data.success) {
+      Swal.fire({
+        title: "ลบสำเร็จ!",
+        text: "ลบรายการแข่งขันเรียบร้อยแล้ว",
+        icon: "success",
+        timer: 1500,
+        showConfirmButton: false,
+        background: "#0f172a",
+        color: "#fff",
+      });
+      get().fetchTournaments();
+    }
+  } catch (error: any) {
+    Swal.fire({
+      title: "ไม่สามารถลบได้!",
+      text: error.response?.data?.message || "เกิดข้อผิดพลาดในการลบรายการ",
+      icon: "error",
+      background: "#0f172a",
+      color: "#fff",
+    });
+  }
+},
+
+courses: [],
+fetchCourses: async () => {
+  try {
+    const response = await apiService.get('/td/courses'); // 👈 ปรับเปลี่ยนท่อส่งมาที่ TD Course Endpoint
+    const fetchedCourses = response?.data?.data || response?.data || [];
+    set({ courses: fetchedCourses });
+    return fetchedCourses;
+  } catch (error) {
+    console.error("❌ Fetch Courses Failed:", error);
+    set({ courses: [] });
+    return [];
+  }
+},
 
 }));
+
