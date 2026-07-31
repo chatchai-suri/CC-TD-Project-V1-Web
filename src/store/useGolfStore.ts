@@ -47,20 +47,21 @@ export const useGolfStore = create<any>((set: any, get: any) => ({
   courseHoles: [], // เก็บคลังข้อมูล 18 หลุม (hole_no, par, index)
   activeTournamentId: null, // เก็บรหัสทัวร์นาเมนต์ปัจจุบันเพื่อคุม State Invalidation
 
-  fetchTournaments: async () => {
-    set({ isLoading: true, error: null });
-    try {
-      const response = await apiService.get('/user/tournaments');
-      const fetchedData = response?.data?.data || response?.data || [];
-      console.log("⛳ Fetched Tournaments Data:", fetchedData);
-      set({ tournaments: fetchedData, isLoading: false });
-      return fetchedData;
-    } catch (err: any) {
-      console.error("❌ Fetch Tournaments Error:", err);
-      set({ tournaments: [], isLoading: false, error: err });
-      return [];
-    }
-  },
+fetchTournaments: async () => {
+  set({ isLoading: true, error: null });
+  try {
+    // 🎯 [Fix Endpoint]: เปลี่ยนจาก /user/tournaments เป็น /td/tournaments ให้ตรงกับบทบาท TD Panel
+    const response = await apiService.get('/td/tournaments');
+    const fetchedData = response?.data?.data || response?.data || [];
+    console.log("⛳ [TD Panel] Fetched Tournaments Data via /td/tournaments:", fetchedData);
+    set({ tournaments: fetchedData, isLoading: false });
+    return fetchedData;
+  } catch (err: any) {
+    console.error("❌ Fetch Tournaments Error:", err);
+    set({ tournaments: [], isLoading: false, error: err });
+    return [];
+  }
+},
 
 fetchUserList: async () => {
     try {
