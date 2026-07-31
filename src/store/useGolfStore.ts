@@ -415,14 +415,39 @@ deleteTournament: async (id: number) => {
 courses: [],
 fetchCourses: async () => {
   try {
-    const response = await apiService.get('/td/courses'); // 👈 ปรับเปลี่ยนท่อส่งมาที่ TD Course Endpoint
+    // 🎯 Step 1: ลองยิงท่อหลัก /td/courses
+    const response = await apiService.get('/td/courses');
     const fetchedCourses = response?.data?.data || response?.data || [];
-    set({ courses: fetchedCourses });
-    return fetchedCourses;
-  } catch (error) {
-    console.error("❌ Fetch Courses Failed:", error);
-    set({ courses: [] });
-    return [];
+    
+    if (Array.isArray(fetchedCourses) && fetchedCourses.length > 0) {
+      console.log("⛳ [Store] Fetched Courses Success via /td/courses:", fetchedCourses);
+      set({ courses: fetchedCourses });
+      return fetchedCourses;
+    }
+
+    // 🎯 Step 2: Fallback ยิงท่อสำรอง /user/courses กรณีท่อแรกได้ Array ว่าง
+    console.warn("⚠️ /td/courses returned empty, trying fallback /user/courses...");
+    const fallbackRes = await apiService.get('/user/courses');
+    const fallbackData = fallbackRes?.data?.data || fallbackRes?.data || [];
+    set({ courses: fallbackData });
+    return fallbackData;
+
+  } catch (error: any) {
+    const errorDetail = error?.response?.data?.message || error?.message || "Unknown Network Error";
+    console.error("❌ Fetch Courses Failed - Diagnostic Error Message:", errorDetail, error);
+
+    // 🎯 Step 3: กรณี Error ให้ลองยิงท่อกลาง /courses เป็นไม้ตายสุดท้าย
+    try {
+      const lastTryRes = await apiService.get('/courses');
+      const lastTryData = lastTryRes?.data?.data || lastTryRes?.data || [];
+      set({ courses: lastTryData });
+      return lastTryData;
+    } catch (finalErr: any) {
+      const finalMsg = finalErr?.response?.data?.message || finalErr?.message || errorDetail;
+      console.error("❌ All Course Endpoints Failed. Final Error Message:", finalMsg);
+      set({ courses: [], error: finalMsg });
+      return [];
+    }
   }
 },
 

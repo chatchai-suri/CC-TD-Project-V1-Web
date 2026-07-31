@@ -132,8 +132,12 @@ function TdTournaments() {
                       <h3 className="font-black text-slate-800 text-xs leading-tight truncate">{currentMatchName}</h3>
                       {/* 📍 สนาม + 📅 วันที่ แบบกระชับ ไม่แตกบรรทัดล้น */}
                       <div className="flex items-center text-[10px] text-slate-500 mt-0.5 font-medium min-w-0 space-x-1">
-                        <span className="truncate flex-1">📍 {t.course_name || "-"}</span>
-                        <span className="shrink-0">| 📅 {t.event_date ? new Date(t.event_date).toISOString().split('T')[0] : "2026-07-20"}</span>
+                        <span className="truncate flex-1">
+                          📍 {t.course?.course_name || t.course_name || t.courseTitle || "-"}
+                        </span>
+                        <span className="shrink-0">
+                          | 📅 {t.event_date ? new Date(t.event_date).toISOString().split('T')[0] : "2026-07-20"}
+                        </span>
                       </div>
                     </div>
                     
