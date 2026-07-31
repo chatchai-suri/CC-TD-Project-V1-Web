@@ -1,11 +1,14 @@
 // src/pages/golfer/GolferScorecard.tsx
-
 import { useEffect, useState } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { useGolfStore } from "../../store/useGolfStore";
 import { apiService } from "../../utils/apiService";
 import Swal from "sweetalert2";
 
+/**
+ * 🎯 วัตถุประสงค์: หน้าจอใบคะแนนการแข่งขันทางการ (Official Digital Scorecard)
+ * @description ดึงรายละเอียดสโตรกคะแนนรายหลุมของนักกอล์ฟบุคคลเพื่อสรุปอันดับ Final และอำนวยความสะดวกในการ Capture หน้าจอ
+ */
 export default function GolferScorecard() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -22,6 +25,30 @@ export default function GolferScorecard() {
   const [directHoles, setDirectHoles] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // 📅 Helper ฟังก์ชันแปลงวันที่ความไวสูง ป้องกัน null [ - ] 100%
+  const formatDisplayDate = (dateVal: any) => {
+    if (!dateVal) return "-";
+    
+    const strVal = String(dateVal).trim();
+    if (strVal.includes("T")) {
+      return strVal.split("T")[0];
+    }
+    if (strVal.length >= 10 && strVal.includes("-")) {
+      return strVal.substring(0, 10);
+    }
+
+    try {
+      const d = new Date(dateVal);
+      if (!isNaN(d.getTime())) {
+        return d.toISOString().split("T")[0];
+      }
+    } catch (e) {
+      // ignore
+    }
+
+    return "-";
+  };
 
   // 1. Centralized Master Hydration
   useEffect(() => {
@@ -40,7 +67,6 @@ export default function GolferScorecard() {
       try {
         const res = await apiService.get(`/user/scorecard/${userId}?tournament_id=${tournamentId}`);
         
-        // 🛡️ Fail Explicitly Guard
         if (res.data && res.data.success && Array.isArray(res.data.hole_scores)) {
           setDirectHoles(res.data.hole_scores);
         } else {
@@ -66,17 +92,12 @@ export default function GolferScorecard() {
 
   const playerResult = tournamentResult?.leaderboard?.find((r: any) => Number(r.user_id) === userId);
 
-  // 🎯 STRICT SINGLE SOURCE MAPPER (แก้ไขเป๊ะตามที่คุณปูวางโครงสร้าง)
+  // 🎯 STRICT SINGLE SOURCE MAPPER
   const fullHoles = Array.from({ length: 18 }, (_, i) => {
     const holeNo = i + 1;
-    
-    // ดึง Master Specs จาก Store กลางเป็นหลัก
     const masterHole = courseHoles.find((m: any) => Number(m.hole_no) === holeNo);
-    
-    // ดึง Score ตรงจาก Flat Array Response
     const foundScore = directHoles.find((s: any) => Number(s.hole_no) === holeNo);
 
-    // Strict Validation Fallback
     const parValue = masterHole?.par || foundScore?.par || 4;
     const strokeValue = foundScore ? Number(foundScore.strokes ?? foundScore.stroke ?? 0) : 0;
 
@@ -103,135 +124,139 @@ export default function GolferScorecard() {
   };
 
   return (
-    <div className="w-full bg-white text-slate-900 font-sans p-1 text-[11px]">
+    <div className="w-full bg-white text-slate-900 font-sans p-1 text-[11px] min-h-[600px] flex flex-col justify-between">
       
-      {/* Header Back Button */}
-      <div className="flex items-center justify-between pb-2 border-b border-slate-100 mb-3">
-        <button
-          onClick={() => navigate(`/golfer/leaderboard?id=${tournamentId}&status=${statusMode}`)}
-          className="inline-flex items-center gap-1 text-xs font-bold text-blue-600 hover:text-blue-800 transition-colors cursor-pointer"
-        >
-          ⬅️ กลับกระดานผู้นำ
-        </button>
-        <span className="text-[10px] bg-emerald-600 text-white font-black px-2 py-0.5 rounded shadow-sm">
-          📸 OFFICIAL SCORECARD
-        </span>
-      </div>
-
-      {/* Player Header Box */}
-      <div className="bg-gradient-to-br from-slate-50 to-slate-100 rounded-xl p-2.5 border border-slate-200 mb-3 text-left shadow-sm">
-        <div className="flex justify-between items-center">
-          <div>
-            <span className="text-[9px] font-black text-emerald-700 uppercase tracking-widest block">⛳ DIGITAL SCORECARD</span>
-            <h3 className="text-xs font-black text-slate-900 leading-tight line-clamp-1">{tournamentResult?.tournament_name || "Amata Alpha Championship 2026"}</h3>
-          </div>
-          <div className="bg-amber-500 text-slate-950 rounded-md px-2 py-0.5 text-center shrink-0 font-black shadow-sm">
-            <span className="text-[10px] font-mono">Rank #{playerResult?.rank || "-"}</span>
-          </div>
+      <div>
+        {/* Header Back Button */}
+        <div className="flex items-center justify-between pb-2 border-b border-slate-100 mb-3">
+          <button
+            onClick={() => navigate(`/golfer/leaderboard?id=${tournamentId}&status=${statusMode}`)}
+            className="inline-flex items-center gap-1 text-xs font-bold text-blue-600 hover:text-blue-800 transition-colors cursor-pointer"
+          >
+            ⬅️ กลับกระดานผู้นำ
+          </button>
+          <span className="text-[10px] bg-emerald-600 text-white font-black px-2 py-0.5 rounded shadow-sm">
+            📸 OFFICIAL SCORECARD
+          </span>
         </div>
 
-        <div className="mt-2 grid grid-cols-2 gap-x-2 gap-y-1 text-[10px] text-slate-600 border-t border-slate-200/60 pt-1.5 font-semibold">
-          <div className="truncate">👤 Player: <strong className="text-blue-700 font-bold">{playerName}</strong></div>
-          <div className="truncate">📍 Course: <strong className="text-slate-900">{tournamentResult?.course_name || "Amata Spring CC"}</strong></div>
-          <div className="truncate">📋 System: <strong className="text-slate-900">Peoria-DMN</strong></div>
-        </div>
-      </div>
-
-      {/* 🚨 FAIL EXPLICITLY */}
-      {errorMessage && (
-        <div className="mb-3 p-2 bg-rose-50 border border-rose-200 text-rose-700 text-[10px] font-bold rounded-lg text-left">
-          {errorMessage}
-        </div>
-      )}
-
-      {isLoading ? (
-        <div className="py-8 text-center text-slate-400 text-xs animate-pulse">
-          🔄 กำลังดึงใบคะแนนรายหลุมข้ามเครือข่าย...
-        </div>
-      ) : (
-        <div className="space-y-2">
-          
-          {/* OUT (Hole 1-9) */}
-          <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
-            <table className="w-full text-center border-collapse table-fixed text-[10px]">
-              <thead>
-                <tr className="bg-slate-900 text-white font-bold font-mono">
-                  <th className="py-1 border-r border-slate-800 text-left px-1.5 w-[45px]">OUT</th>
-                  {outHoles.map((_, i) => (
-                    <th key={i} className="border-r border-slate-800 py-1">#{i + 1}</th>
-                  ))}
-                  <th className="py-1 bg-emerald-800 text-white w-[35px]">TOT</th>
-                </tr>
-              </thead>
-              <tbody className="font-mono font-bold divide-y divide-slate-100 text-[10px]">
-                <tr className="bg-slate-50 text-slate-500">
-                  <td className="py-1 border-r border-slate-200 text-left px-1.5">PAR</td>
-                  {outHoles.map((h: any, i: number) => <td key={i} className="border-r border-slate-200">{h.par}</td>)}
-                  <td className="bg-emerald-50 text-emerald-900">{calculateTotal(outHoles, 'par')}</td>
-                </tr>
-                <tr className="bg-white text-slate-900">
-                  <td className="py-1 border-r border-slate-200 text-left px-1.5 text-purple-600 font-sans font-black">SCORE</td>
-                  {outHoles.map((h: any, i: number) => {
-                    const strokeVal = Number(h.stroke) || 0;
-                    const parVal = Number(h.par) || 4;
-                    const cellStyle = getCellScoreStyle(strokeVal, parVal);
-                    return <td key={i} className={`border-r border-slate-200 py-1 ${cellStyle}`}>{strokeVal || "-"}</td>;
-                  })}
-                  <td className="bg-slate-900 text-yellow-400 font-black">{calculateTotal(outHoles, 'stroke')}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          {/* IN (Hole 10-18) */}
-          <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
-            <table className="w-full text-center border-collapse table-fixed text-[10px]">
-              <thead>
-                <tr className="bg-slate-900 text-white font-bold font-mono">
-                  <th className="py-1 border-r border-slate-800 text-left px-1.5 w-[45px]">IN</th>
-                  {inHoles.map((_, i) => (
-                    <th key={i} className="border-r border-slate-800 py-1">#{i + 10}</th>
-                  ))}
-                  <th className="py-1 bg-emerald-800 text-white w-[35px]">TOT</th>
-                </tr>
-              </thead>
-              <tbody className="font-mono font-bold divide-y divide-slate-100 text-[10px]">
-                <tr className="bg-slate-50 text-slate-500">
-                  <td className="py-1 border-r border-slate-200 text-left px-1.5">PAR</td>
-                  {inHoles.map((h: any, i: number) => <td key={i} className="border-r border-slate-200">{h.par}</td>)}
-                  <td className="bg-emerald-50 text-emerald-900">{calculateTotal(inHoles, 'par')}</td>
-                </tr>
-                <tr className="bg-white text-slate-900">
-                  <td className="py-1 border-r border-slate-200 text-left px-1.5 text-purple-600 font-sans font-black">SCORE</td>
-                  {inHoles.map((h: any, i: number) => {
-                    const strokeVal = Number(h.stroke) || 0;
-                    const parVal = Number(h.par) || 4;
-                    const cellStyle = getCellScoreStyle(strokeVal, parVal);
-                    return <td key={i} className={`border-r border-slate-200 py-1 ${cellStyle}`}>{strokeVal || "-"}</td>;
-                  })}
-                  <td className="bg-slate-900 text-yellow-400 font-black">{calculateTotal(inHoles, 'stroke')}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          {/* GROSS / HD / NET Summary Box */}
-          <div className="bg-slate-900 text-white rounded-xl p-2.5 flex justify-between items-center px-3 font-sans shadow-inner shrink-0">
-            <div className="flex gap-2 text-[10px]">
-              <span>GROSS: <strong className="text-yellow-400 font-mono font-black">{calculateTotal(fullHoles, 'stroke') || playerResult?.total_gross || 0}</strong></span>
+        {/* Player Header Box - เพิ่มฟีลด์ 📅 Date */}
+        <div className="bg-gradient-to-br from-slate-50 to-slate-100 rounded-xl p-2.5 border border-slate-200 mb-3 text-left shadow-sm">
+          <div className="flex justify-between items-center">
+            <div>
+              <span className="text-[9px] font-black text-emerald-700 uppercase tracking-widest block">⛳ DIGITAL SCORECARD</span>
+              <h3 className="text-xs font-black text-slate-900 leading-tight line-clamp-1">{tournamentResult?.tournament_name || "Amata Alpha Championship 2026"}</h3>
             </div>
-            <div className="text-[10px] text-right font-semibold">
-              <span>HD: <strong className="text-amber-400 font-mono font-bold">{playerResult?.handicap ?? playerResult?.calculated_hd ?? 0}</strong></span>
-              <span className="ml-2">NET: <strong className="text-emerald-400 font-mono font-black">{playerResult?.net ?? playerResult?.calculated_net ?? 0}</strong></span>
+            <div className="bg-amber-500 text-slate-950 rounded-md px-2 py-0.5 text-center shrink-0 font-black shadow-sm">
+              <span className="text-[10px] font-mono">Rank #{playerResult?.rank || "-"}</span>
             </div>
           </div>
 
+          <div className="mt-2 grid grid-cols-2 gap-x-2 gap-y-1 text-[10px] text-slate-600 border-t border-slate-200/60 pt-1.5 font-semibold">
+            <div className="truncate">👤 Player: <strong className="text-blue-700 font-bold">{playerName}</strong></div>
+            <div className="truncate">📍 Course: <strong className="text-slate-900">{tournamentResult?.course_name || "Amata Spring CC"}</strong></div>
+            {/* 📅 แสดงผล Date ที่ถูกต้อง */}
+            <div className="truncate">📅 Date: <strong className="text-slate-900">{formatDisplayDate(tournamentResult?.event_date || tournamentResult?.eventDate || tournamentResult?.date)}</strong></div>
+            <div className="truncate">📋 System: <strong className="text-slate-900">Peoria-DMN</strong></div>
+          </div>
         </div>
-      )}
 
-      <p className="text-[8px] text-slate-400 text-center mt-3 tracking-tight">
-        * Certified Digital Scorecard - Powered by GOLF-TD Platform 2026
-      </p>
+        {errorMessage && (
+          <div className="mb-3 p-2 bg-rose-50 border border-rose-200 text-rose-700 text-[10px] font-bold rounded-lg text-left">
+            {errorMessage}
+          </div>
+        )}
+
+        {isLoading ? (
+          <div className="py-8 text-center text-slate-400 text-xs animate-pulse">
+            🔄 กำลังดึงใบคะแนนรายหลุมข้ามเครือข่าย...
+          </div>
+        ) : (
+          <div className="space-y-2">
+            
+            {/* OUT (Hole 1-9) */}
+            <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+              <table className="w-full text-center border-collapse table-fixed text-[10px]">
+                <thead>
+                  <tr className="bg-slate-900 text-white font-bold font-mono">
+                    <th className="py-1 border-r border-slate-800 text-left px-1.5 w-[45px]">OUT</th>
+                    {outHoles.map((_, i) => (
+                      <th key={i} className="border-r border-slate-800 py-1">#{i + 1}</th>
+                    ))}
+                    <th className="py-1 bg-emerald-800 text-white w-[35px]">TOT</th>
+                  </tr>
+                </thead>
+                <tbody className="font-mono font-bold divide-y divide-slate-100 text-[10px]">
+                  <tr className="bg-slate-50 text-slate-500">
+                    <td className="py-1 border-r border-slate-200 text-left px-1.5">PAR</td>
+                    {outHoles.map((h: any, i: number) => <td key={i} className="border-r border-slate-200">{h.par}</td>)}
+                    <td className="bg-emerald-50 text-emerald-900">{calculateTotal(outHoles, 'par')}</td>
+                  </tr>
+                  <tr className="bg-white text-slate-900">
+                    <td className="py-1 border-r border-slate-200 text-left px-1.5 text-purple-600 font-sans font-black">SCORE</td>
+                    {outHoles.map((h: any, i: number) => {
+                      const strokeVal = Number(h.stroke) || 0;
+                      const parVal = Number(h.par) || 4;
+                      const cellStyle = getCellScoreStyle(strokeVal, parVal);
+                      return <td key={i} className={`border-r border-slate-200 py-1 ${cellStyle}`}>{strokeVal || "-"}</td>;
+                    })}
+                    <td className="bg-slate-900 text-yellow-400 font-black">{calculateTotal(outHoles, 'stroke')}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            {/* IN (Hole 10-18) */}
+            <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+              <table className="w-full text-center border-collapse table-fixed text-[10px]">
+                <thead>
+                  <tr className="bg-slate-900 text-white font-bold font-mono">
+                    <th className="py-1 border-r border-slate-800 text-left px-1.5 w-[45px]">IN</th>
+                    {inHoles.map((_, i) => (
+                      <th key={i} className="border-r border-slate-800 py-1">#{i + 10}</th>
+                    ))}
+                    <th className="py-1 bg-emerald-800 text-white w-[35px]">TOT</th>
+                  </tr>
+                </thead>
+                <tbody className="font-mono font-bold divide-y divide-slate-100 text-[10px]">
+                  <tr className="bg-slate-50 text-slate-500">
+                    <td className="py-1 border-r border-slate-200 text-left px-1.5">PAR</td>
+                    {inHoles.map((h: any, i: number) => <td key={i} className="border-r border-slate-200">{h.par}</td>)}
+                    <td className="bg-emerald-50 text-emerald-900">{calculateTotal(inHoles, 'par')}</td>
+                  </tr>
+                  <tr className="bg-white text-slate-900">
+                    <td className="py-1 border-r border-slate-200 text-left px-1.5 text-purple-600 font-sans font-black">SCORE</td>
+                    {inHoles.map((h: any, i: number) => {
+                      const strokeVal = Number(h.stroke) || 0;
+                      const parVal = Number(h.par) || 4;
+                      const cellStyle = getCellScoreStyle(strokeVal, parVal);
+                      return <td key={i} className={`border-r border-slate-200 py-1 ${cellStyle}`}>{strokeVal || "-"}</td>;
+                    })}
+                    <td className="bg-slate-900 text-yellow-400 font-black">{calculateTotal(inHoles, 'stroke')}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            {/* GROSS / HD / NET Summary Box */}
+            <div className="bg-slate-900 text-white rounded-xl p-2.5 flex justify-between items-center px-3 font-sans shadow-inner shrink-0">
+              <div className="flex gap-2 text-[10px]">
+                <span>GROSS: <strong className="text-yellow-400 font-mono font-black">{calculateTotal(fullHoles, 'stroke') || playerResult?.total_gross || 0}</strong></span>
+              </div>
+              <div className="text-[10px] text-right font-semibold">
+                <span>HD: <strong className="text-amber-400 font-mono font-bold">{playerResult?.handicap ?? playerResult?.calculated_hd ?? 0}</strong></span>
+                <span className="ml-2">NET: <strong className="text-emerald-400 font-mono font-black">{playerResult?.net ?? playerResult?.calculated_net ?? 0}</strong></span>
+              </div>
+            </div>
+
+          </div>
+        )}
+      </div>
+
+      {/* 📄 Responsive Footer */}
+      <footer className="mt-4 pt-2 border-t border-slate-100 text-center text-[10px] text-slate-400 font-medium shrink-0">
+        <p>Copyright © 2026 Chatchai Suriyawan. All rights reserved.</p>
+      </footer>
 
     </div>
   );

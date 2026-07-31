@@ -7,6 +7,10 @@ import { apiService } from "../../utils/apiService";
 import { STATUS_STYLES } from "../../utils/statusStyles";
 import Swal from "sweetalert2";
 
+/**
+ * 🎯 วัตถุประสงค์: หน้าจอกระดานผู้นำผลการแข่งขัน (Live / Final Leaderboard)
+ * @description รองรับการสลับกติกา Peoria/NO-HD และแยกสิทธิ์ผู้ใช้งานในการกดดู Scorecard หรือเข้าแผง Scoring Panel
+ */
 export default function GolferLeaderboard() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -26,7 +30,33 @@ export default function GolferLeaderboard() {
     }
   }, [tournamentId, fetchTournamentResult]);
 
-  // 🎯 แก้จุดหลุด Case-Sensitive: แปลงสถานะเป็นตัวพิมพ์เล็กป้องกัน "LIVE" ชน "live"
+  // 📅 Helper ฟังก์ชันแปลงวันที่ความไวสูง สกัดสลับ ISO/String ป้องกัน null [ - ] 100%
+  const formatDisplayDate = (dateVal: any) => {
+    if (!dateVal) return "-";
+    
+    // 1. ถ้าส่งมาเป็น ISO String ยาว เช่น "2026-08-01T00:00:00.000Z" หรือ String YYYY-MM-DD
+    const strVal = String(dateVal).trim();
+    if (strVal.includes("T")) {
+      return strVal.split("T")[0];
+    }
+    if (strVal.length >= 10 && strVal.includes("-")) {
+      return strVal.substring(0, 10);
+    }
+
+    // 2. ลองพาร์สด้วย Date Object เป็นไม้ตายสุดท้าย
+    try {
+      const d = new Date(dateVal);
+      if (!isNaN(d.getTime())) {
+        return d.toISOString().split("T")[0];
+      }
+    } catch (e) {
+      // ignore
+    }
+
+    return "-";
+  };
+
+  // 🎯 แปลงสถานะเป็นตัวพิมพ์เล็กป้องกัน "LIVE" ชน "live"
   const matchStatus = (tournamentResult?.status || searchParams.get("status") || "live").toLowerCase();
   const isLiveMode = matchStatus === "live";
   
@@ -37,7 +67,7 @@ export default function GolferLeaderboard() {
   const displayLeaderboard = tournamentResult?.leaderboard || [];
   const userRole = currentUser?.global_role || "GUEST";
 
-  // 🔀 ฟังก์ชันสมองกลนำทางขากลับตามบทบาทจริง
+  // 🔀 ฟังก์ชันนำทางขากลับตามบทบาทจริง
   const handleReturnToTournaments = () => {
     const globalRole = currentUser?.global_role || currentUser?.role || "GUEST";
     if (globalRole === "TD" || globalRole === "ADMIN") {
@@ -90,206 +120,210 @@ export default function GolferLeaderboard() {
   };
 
   return (
-    <div className="w-full bg-white text-slate-900 font-sans p-1 sm:p-4">
-      {/* ส่วนหัวป้ายนำทาง */}
-      <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
-        <button
-          onClick={handleReturnToTournaments}
-          className="inline-flex items-center gap-1 text-xs font-semibold text-blue-600 hover:text-blue-800 transition-colors cursor-pointer"
-        >
-          ⬅️ กลับไปตารางแข่ง
-        </button>
-        <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border ${
-          isLiveMode ? STATUS_STYLES.live.badge : STATUS_STYLES.final.badge
-        }`}>
-          {isLiveMode ? "⚡ LIVE SCORE" : "🏆 FINAL SCORE"}
-        </span>
-      </div>
-
-      {/* 👑 แผงควบคุมสโมสรส่วนพิเศษสำหรับ TD */}
-      {(userRole === "TD" || userRole === "ADMIN") && isLiveMode && (
-        <div className="mb-4 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 p-2.5 rounded-2xl flex items-center justify-between shadow-sm">
-          <div className="text-left">
-            <span className="text-xs font-black text-amber-900 flex items-center gap-1">
-              <span>👑</span> แผงควบคุมสโมสร (TD Control)
-            </span>
-            <span className="text-[10px] text-amber-700 block mt-0.5">
-              {isNoHdMode 
-                ? "กติกา Gross Only (NO-HD): สรุปผลคะแนนดิบและปิดแมตช์การแข่งขัน" 
-                : "คะแนนครบแล้ว พร้อมจับฉลากหลุมลับคิดแต้มต่อ Peoria-DMN"}
-            </span>
-          </div>
-
-          {isNoHdMode ? (
-            /* 🟢 ปุ่มปิดแมตช์ตรงสำหรับกติกา NO-HD */
-            <button
-              onClick={async () => {
-                const result = await Swal.fire({
-                  title: "ยืนยันปิดแมตช์แข่งขัน?",
-                  text: "กติกา NO-HD (Gross Only) จะสรุปผลอันดับตามคะแนนดิบจริงทันที",
-                  icon: "warning",
-                  showCancelButton: true,
-                  confirmButtonText: "🏆 ปิดแมตช์ทันที",
-                  cancelButtonText: "ยกเลิก",
-                  confirmButtonColor: "#059669"
-                });
-                if (result.isConfirmed) {
-                  handleCloseTournament([]);
-                }
-              }}
-              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow-md transition-all active:scale-95 cursor-pointer flex items-center gap-1 shrink-0"
-            >
-              <span>🏆</span> ปิดแมตช์ (NO-HD)
-            </button>
-          ) : (
-            /* 🎲 ปุ่มสุ่มหลุมลับสำหรับกติกา Peoria */
-            <button
-              onClick={() => setIsPeoriaModalOpen(true)}
-              className="px-3 py-1.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-xs rounded-xl shadow-md transition-all active:scale-95 cursor-pointer flex items-center gap-1 shrink-0"
-            >
-              <span>🎲</span> สุ่มหลุมลับ
-            </button>
-          )}
+    <div className="w-full bg-white text-slate-900 font-sans p-1 sm:p-4 min-h-[600px] flex flex-col justify-between">
+      <div>
+        {/* ส่วนหัวป้ายนำทาง */}
+        <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
+          <button
+            onClick={handleReturnToTournaments}
+            className="inline-flex items-center gap-1 text-xs font-semibold text-blue-600 hover:text-blue-800 transition-colors cursor-pointer"
+          >
+            ⬅️ กลับไปตารางแข่ง
+          </button>
+          <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border ${
+            isLiveMode ? STATUS_STYLES.live.badge : STATUS_STYLES.final.badge
+          }`}>
+            {isLiveMode ? "⚡ LIVE SCORE" : "🏆 FINAL SCORE"}
+          </span>
         </div>
-      )}
 
-      {/* 🎯 เชื่อมต่อ PeoriaModal พร้อมส่ง Props ครบถ้วน */}
-      <PeoriaModal
-        isOpen={isPeoriaModalOpen}
-        onClose={() => setIsPeoriaModalOpen(false)}
-        tournament={tournamentResult}
-        onConfirmCloseMatch={handleCloseTournament}
-      />
+        {/* 👑 แผงควบคุมสโมสรส่วนพิเศษสำหรับ TD */}
+        {(userRole === "TD" || userRole === "ADMIN") && isLiveMode && (
+          <div className="mb-4 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 p-2.5 rounded-2xl flex items-center justify-between shadow-sm">
+            <div className="text-left">
+              <span className="text-xs font-black text-amber-900 flex items-center gap-1">
+                <span>👑</span> แผงควบคุมสโมสร (TD Control)
+              </span>
+              <span className="text-[10px] text-amber-700 block mt-0.5">
+                {isNoHdMode 
+                  ? "กติกา Gross Only (NO-HD): สรุปผลคะแนนดิบและปิดแมตช์การแข่งขัน" 
+                  : "คะแนนครบแล้ว พร้อมจับฉลากหลุมลับคิดแต้มต่อ Peoria-DMN"}
+              </span>
+            </div>
 
-      {/* บล็อกหัวเรื่องภาพรวมแมตช์ */}
-      <div className="mb-4 text-left">
-        <h3 className="text-base font-black text-slate-900 tracking-tight line-clamp-1">
-          🏆 {tournamentResult?.tournament_name || "Amata Alpha Championship 2026"}
-        </h3>
-        <p className="text-[11px] text-slate-500 mt-0.5 flex items-center gap-1.5">
-          <span>📍 Amata Spring CC</span>
-          <span className="text-slate-300">|</span>
-          <span>📅 2026-07-23</span>
-        </p>
-        
-        {/* กล่องเฉลยหลุมลับ (แสดงเฉพาะกติกาที่ใช้ Peoria / มีแต้มต่อ) */}
-        {!isNoHdMode && (
-          <div className={`mt-2 p-2 rounded-lg border text-left ${isLiveMode ? "bg-slate-50 border-slate-200" : "bg-amber-50 border-amber-200"}`}>
-            <p className={`text-[10px] font-bold ${isLiveMode ? "text-slate-500" : "text-amber-800"}`}>
-              {isLiveMode ? "🔒 หลุมลับประมวลผล Peoria จะแสดงเมื่อสถานะการแข่งขันจบรอบลงตัว" : "🔍 รายชื่อหลุมลับ Peoria จากฉลากปาร์ตี้เลี้ยงฉลอง"}
-            </p>
-            <p className="text-xs font-black text-slate-950 mt-0.5 tracking-widest">
-              ⛳ หลุมลับ: [ <span className={isLiveMode ? "text-slate-400 font-medium" : "text-amber-900 font-black"}>{tournamentResult?.peoria_hidden_holes || (isLiveMode ? "??, ??, ??, ??, ??, ??" : "1, 3, 5, 11, 14, 16")}</span> ]
-            </p>
+            {isNoHdMode ? (
+              <button
+                onClick={async () => {
+                  const result = await Swal.fire({
+                    title: "ยืนยันปิดแมตช์แข่งขัน?",
+                    text: "กติกา NO-HD (Gross Only) จะสรุปผลอันดับตามคะแนนดิบจริงทันที",
+                    icon: "warning",
+                    showCancelButton: true,
+                    confirmButtonText: "🏆 ปิดแมตช์ทันที",
+                    cancelButtonText: "ยกเลิก",
+                    confirmButtonColor: "#059669"
+                  });
+                  if (result.isConfirmed) {
+                    handleCloseTournament([]);
+                  }
+                }}
+                className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow-md transition-all active:scale-95 cursor-pointer flex items-center gap-1 shrink-0"
+              >
+                <span>🏆</span> ปิดแมตช์ (NO-HD)
+              </button>
+            ) : (
+              <button
+                onClick={() => setIsPeoriaModalOpen(true)}
+                className="px-3 py-1.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-xs rounded-xl shadow-md transition-all active:scale-95 cursor-pointer flex items-center gap-1 shrink-0"
+              >
+                <span>🎲</span> สุ่มหลุมลับ
+              </button>
+            )}
           </div>
         )}
 
-        <div className="mt-2 flex flex-wrap gap-2 text-[10px] bg-slate-50 p-2 rounded-lg border border-slate-100">
-          <span className="text-slate-600 font-medium">⛳ Par: <strong className="text-slate-950 font-bold">{tournamentResult?.par || 72}</strong></span>
-          <span className="text-slate-300">|</span>
-          <span className="text-slate-600 font-medium">📋 Rule: <strong className="text-slate-950 font-bold">
-            {isNoHdMode ? "Gross Only (NO-HD)" : (tournamentResult?.handicap_rule || tournamentResult?.tournament_mode || "Peoria-DMN System")}
-          </strong></span>
+        <PeoriaModal
+          isOpen={isPeoriaModalOpen}
+          onClose={() => setIsPeoriaModalOpen(false)}
+          tournament={tournamentResult}
+          onConfirmCloseMatch={handleCloseTournament}
+        />
+
+        {/* บล็อกหัวเรื่องภาพรวมแมตช์ */}
+        <div className="mb-4 text-left">
+          <h3 className="text-base font-black text-slate-900 tracking-tight line-clamp-1">
+            🏆 {tournamentResult?.tournament_name || tournamentResult?.title}
+          </h3>
+          <p className="text-[11px] text-slate-500 mt-0.5 flex items-center gap-1.5">
+            <span>📍 {tournamentResult?.course_name || tournamentResult?.course?.course_name || "-"}</span>
+            <span className="text-slate-300">|</span>
+            {/* 📅 แก้ปัญหา Date null [ - ] */}
+            <span>📅 {formatDisplayDate(tournamentResult?.event_date || tournamentResult?.eventDate || tournamentResult?.date)}</span>
+          </p>
+          
+          {!isNoHdMode && (
+            <div className={`mt-2 p-2 rounded-lg border text-left ${isLiveMode ? "bg-slate-50 border-slate-200" : "bg-amber-50 border-amber-200"}`}>
+              <p className={`text-[10px] font-bold ${isLiveMode ? "text-slate-500" : "text-amber-800"}`}>
+                {isLiveMode ? "🔒 หลุมลับประมวลผล Peoria จะแสดงเมื่อสถานะการแข่งขันจบรอบลงตัว" : "🔍 รายชื่อหลุมลับ Peoria จากฉลากปาร์ตี้เลี้ยงฉลอง"}
+              </p>
+              <p className="text-xs font-black text-slate-950 mt-0.5 tracking-widest">
+                ⛳ หลุมลับ: [ <span className={isLiveMode ? "text-slate-400 font-medium" : "text-amber-900 font-black"}>{tournamentResult?.peoria_hidden_holes || (isLiveMode ? "??, ??, ??, ??, ??, ??" : "1, 3, 5, 11, 14, 16")}</span> ]
+              </p>
+            </div>
+          )}
+
+          <div className="mt-2 flex flex-wrap gap-2 text-[10px] bg-slate-50 p-2 rounded-lg border border-slate-100">
+            <span className="text-slate-600 font-medium">⛳ Par: <strong className="text-slate-950 font-bold">{tournamentResult?.par || 72}</strong></span>
+            <span className="text-slate-300">|</span>
+            <span className="text-slate-600 font-medium">📋 Rule: <strong className="text-slate-950 font-bold">
+              {isNoHdMode ? "Gross Only (NO-HD)" : (tournamentResult?.handicap_rule || tournamentResult?.tournament_mode || "Peoria-DMN System")}
+            </strong></span>
+          </div>
         </div>
+
+        {isLoading ? (
+          <div className="flex flex-col items-center justify-center py-12 text-slate-500 text-xs animate-pulse">
+            🔄 กำลังคำนวณสถิติผู้นำข้ามเครือข่าย...
+          </div>
+        ) : (
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-slate-900 text-white text-[10px] font-bold uppercase tracking-wider text-center">
+                  <th className="py-2.5 w-1/12">Pos</th>
+                  <th className="py-2.5 text-left pl-2 w-4/12">Player Name</th>
+                  {isLiveMode ? (
+                    <>
+                      <th className="py-2.5 w-3/12">Holes</th>
+                      <th className="py-2.5 w-4/12 bg-red-950 text-red-200 font-black">To Par / G</th>
+                    </>
+                  ) : (
+                    <>
+                      <th className="py-2.5 w-2/12 text-slate-300">Gross</th>
+                      <th className="py-2.5 w-2/12 text-amber-300">HD</th>
+                      <th className="py-2.5 w-3/12 bg-emerald-900 text-emerald-200 font-black">NET</th>
+                    </>
+                  )}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 text-xs text-slate-700 font-medium text-center">
+                {displayLeaderboard.map((r: any) => {
+                  let toParColor = "text-slate-900";
+                  if (r.total_to_par < 0) toParColor = "text-red-600 font-bold"; 
+                  if (r.total_to_par > 0) toParColor = "text-blue-600"; 
+
+                  return (
+                    <tr 
+                      key={r.user_id} 
+                      onClick={() => handlePlayerClick(r.user_id, r.fullname)}
+                      className="hover:bg-slate-50 transition-colors cursor-pointer border-b"
+                    >
+                      <td className="py-2.5 font-black text-slate-700">
+                        {r.rank === 1 ? "🥇 1" : r.rank === 2 ? "🥈 2" : r.rank === 3 ? "🥉 3" : r.rank}
+                      </td>
+                      
+                      <td className="py-2.5 text-left pl-2 flex items-center gap-1.5">
+                        <img 
+                          src={`https://api.dicebear.com/7.x/adventurer/svg?seed=${r.user_id}`} 
+                          alt="avatar" 
+                          className="w-5 h-5 rounded-full border border-slate-200 bg-slate-50 shrink-0"
+                        />
+                        <div className="min-w-0">
+                          <div className="font-bold text-blue-600 text-xs truncate max-w-[85px] hover:underline">
+                            {r.fullname}
+                          </div>
+                          <div className="text-[8px] text-slate-400 font-normal truncate">
+                            {r.nickname || "-"}
+                          </div>
+                        </div>
+                      </td>
+
+                      {isLiveMode ? (
+                        <>
+                          <td className="py-2.5 font-semibold text-slate-600 text-[11px]">
+                            {r.holes_played} / 18
+                          </td>
+                          <td className="py-2.5 bg-red-50/30">
+                            <span className={`block font-black text-xs ${toParColor}`}>
+                              {r.display_to_par}
+                            </span>
+                            <span className="block text-[9px] text-slate-400 font-normal mt-0.5">
+                              (G: {r.total_gross})
+                            </span>
+                          </td>
+                        </>
+                      ) : (
+                        <>
+                          <td className="py-2.5 font-bold text-slate-600 text-[11px]">
+                            {r.total_gross}
+                          </td>
+                          <td className="py-2.5 font-bold text-amber-600 text-[11px]">
+                            {r.handicap}
+                          </td>
+                          <td className="py-2.5 bg-emerald-50/50 font-black text-emerald-700 text-xs">
+                            {r.net}
+                          </td>
+                        </>
+                      )}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        <p className="text-[10px] text-slate-400 text-center mt-4 italic">
+          {isNoHdMode 
+            ? "* ระบบประมวลผลกติกา Gross Only (ไม่มีแต้มต่อ) สลักผลทางการ"
+            : "* ระบบคำนวณแต้มต่อ Peoria-DMN (Double Morihiro Naoki) สลักผลทางการ"}
+        </p>
       </div>
 
-      {isLoading ? (
-        <div className="flex flex-col items-center justify-center py-12 text-slate-500 text-xs animate-pulse">
-          🔄 กำลังคำนวณสถิติผู้นำข้ามเครือข่าย...
-        </div>
-      ) : (
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-slate-900 text-white text-[10px] font-bold uppercase tracking-wider text-center">
-                <th className="py-2.5 w-1/12">Pos</th>
-                <th className="py-2.5 text-left pl-2 w-4/12">Player Name</th>
-                {isLiveMode ? (
-                  <>
-                    <th className="py-2.5 w-3/12">Holes</th>
-                    <th className="py-2.5 w-4/12 bg-red-950 text-red-200 font-black">To Par / G</th>
-                  </>
-                ) : (
-                  <>
-                    <th className="py-2.5 w-2/12 text-slate-300">Gross</th>
-                    <th className="py-2.5 w-2/12 text-amber-300">HD</th>
-                    <th className="py-2.5 w-3/12 bg-emerald-900 text-emerald-200 font-black">NET</th>
-                  </>
-                )}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 text-xs text-slate-700 font-medium text-center">
-              {displayLeaderboard.map((r: any) => {
-                let toParColor = "text-slate-900";
-                if (r.total_to_par < 0) toParColor = "text-red-600 font-bold"; 
-                if (r.total_to_par > 0) toParColor = "text-blue-600"; 
-
-                return (
-                  <tr 
-                    key={r.user_id} 
-                    onClick={() => handlePlayerClick(r.user_id, r.fullname)}
-                    className="hover:bg-slate-50 transition-colors cursor-pointer border-b"
-                  >
-                    <td className="py-2.5 font-black text-slate-700">
-                      {r.rank === 1 ? "🥇 1" : r.rank === 2 ? "🥈 2" : r.rank === 3 ? "🥉 3" : r.rank}
-                    </td>
-                    
-                    <td className="py-2.5 text-left pl-2 flex items-center gap-1.5">
-                      <img 
-                        src={`https://api.dicebear.com/7.x/adventurer/svg?seed=${r.user_id}`} 
-                        alt="avatar" 
-                        className="w-5 h-5 rounded-full border border-slate-200 bg-slate-50 shrink-0"
-                      />
-                      <div className="min-w-0">
-                        <div className="font-bold text-blue-600 text-xs truncate max-w-[85px] hover:underline">
-                          {r.fullname}
-                        </div>
-                        <div className="text-[8px] text-slate-400 font-normal truncate">
-                          {r.nickname || "-"}
-                        </div>
-                      </div>
-                    </td>
-
-                    {isLiveMode ? (
-                      <>
-                        <td className="py-2.5 font-semibold text-slate-600 text-[11px]">
-                          {r.holes_played} / 18
-                        </td>
-                        <td className="py-2.5 bg-red-50/30">
-                          <span className={`block font-black text-xs ${toParColor}`}>
-                            {r.display_to_par}
-                          </span>
-                          <span className="block text-[9px] text-slate-400 font-normal mt-0.5">
-                            (G: {r.total_gross})
-                          </span>
-                        </td>
-                      </>
-                    ) : (
-                      <>
-                        <td className="py-2.5 font-bold text-slate-600 text-[11px]">
-                          {r.total_gross}
-                        </td>
-                        <td className="py-2.5 font-bold text-amber-600 text-[11px]">
-                          {r.handicap}
-                        </td>
-                        <td className="py-2.5 bg-emerald-50/50 font-black text-emerald-700 text-xs">
-                          {r.net}
-                        </td>
-                      </>
-                    )}
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      <p className="text-[10px] text-slate-400 text-center mt-4 italic">
-        {isNoHdMode 
-          ? "* ระบบประมวลผลกติกา Gross Only (ไม่มีแต้มต่อ) สลักผลทางการ"
-          : "* ระบบคำนวณแต้มต่อ Peoria-DMN (Double Morihiro Naoki) สลักผลทางการ"}
-      </p>
+      {/* 📄 Responsive Footer */}
+      <footer className="mt-4 pt-2 border-t border-slate-100 text-center text-[10px] text-slate-400 font-medium shrink-0">
+        <p>Copyright © 2026 Chatchai Suriyawan. All rights reserved.</p>
+      </footer>
 
     </div>
   );
