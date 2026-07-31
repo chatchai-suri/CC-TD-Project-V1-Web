@@ -1,18 +1,19 @@
 // src/pages/golfer/GolferTournaments.tsx
+
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useGolfStore } from '../../store/useGolfStore';
 import { STATUS_STYLES } from '../../utils/statusStyles';
 
 /**
- * 🎯 วัตถุประสงค์: หน้าจอภาพรวมรายการแข่งขันกоล์ฟสำหรับนักกอล์ฟและแคดดี้ (Golfer Dashboard)
- * @description ดึงประวัติข้อมูลระบบไฮบริดพ่นกางตารางสูตรกระชับ 3 คอลัมน์ ไร้เอเรอร์แจ้งเตือนซ้อน และปราศจาก Sub-Header ดำรกสายตา
+ * 🎯 วัตถุประสงค์: หน้าจอภาพรวมรายการแข่งขันกอล์ฟสำหรับนักกอล์ฟและแคดดี้ (Golfer Dashboard)
+ * @description ดึงประวัติข้อมูลระบบไฮบริดพ่นกางตารางสูตรกระชับ 3 คอลัมน์ ดึงชื่อสนามและวันที่สดๆ จาก DB ตรงมาตรฐานเดียวกับ TD Panel
  */
 export default function GolferTournaments() {
   const navigate = useNavigate();
 
   // ดึงประชากรและสเตตัสระบบจากสมองกลกลาง Zustand Store ส่วนกลาง
-  const tournaments = useGolfStore((state: any) => state.tournaments);
+  const tournaments = useGolfStore((state: any) => state.tournaments || []);
   const fetchTournaments = useGolfStore((state: any) => state.fetchTournaments);
   const isLoading = useGolfStore((state: any) => state.isLoading);
 
@@ -20,9 +21,9 @@ export default function GolferTournaments() {
   useEffect(() => {
     const loadData = async () => {
       try {
-        await fetchTournaments();
+        if (fetchTournaments) await fetchTournaments();
       } catch (err: any) {
-        // ปล่อยให้ลоจิกความปลอดภัยชั้น Store บริหารจัดการสับสายสัญญาณคลังข้อมูลภายในอย่างเงียบเชียบ
+        // ปล่อยให้ลอจิกความปลอดภัยชั้น Store บริหารจัดการสับสายสัญญาณคลังข้อมูลภายในอย่างเงียบเชียบ
       }
     };
     loadData();
@@ -41,7 +42,7 @@ export default function GolferTournaments() {
           </p>
         </div>
 
-        {/* 🎯 2. ลоจิก Conditional Rendering คุมสวิตช์แสดงผลคู่ขนานป้องกันถังข้อมูลว่าง */}
+        {/* 🎯 2. ลอจิก Conditional Rendering คุมสวิตช์แสดงผลคู่ขนานป้องกันถังข้อมูลว่าง */}
         {isLoading ? (
           <div className="flex flex-col items-center justify-center py-12 text-slate-500 text-xs">
             <svg className="animate-spin h-6 w-5 text-emerald-600 mb-2" fill="none" viewBox="0 0 24 24">
@@ -71,25 +72,35 @@ export default function GolferTournaments() {
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-xs text-slate-700">
                   {tournaments.map((t: any) => {
-                    // 🎯 ปรับปรุงการตรวจสอบสถานะทัวร์นาเมนต์ให้ยืดหยุ่น ไร้ปัญหา Case-Sensitive
+                    const currentMatchId = t.tournament_id || t.id;
                     const statusKey = (t.status || 'setup').toLowerCase();
-                    const coursePar = t.par || 70;
+                    const coursePar = t.par || 72;
                     const statusConfig = STATUS_STYLES[statusKey] || STATUS_STYLES.setup;
 
+                    // 📍 ดึงชื่อสนามแบบยืดหยุ่น (แก้จุดบั๊ก Hardcode 'Amata Spring CC')
+                    const displayCourseName = t.course?.course_name || t.course_name || t.courseTitle || "-";
+
+                    // 📅 ดึงวันที่จัดแข่งจริง
+                    const displayEventDate = t.event_date 
+                      ? new Date(t.event_date).toISOString().split('T')[0] 
+                      : (t.date || "-");
+
                     return (
-                      <tr key={t.tournament_id || t.id} className="hover:bg-slate-50 transition-colors">
+                      <tr key={currentMatchId} className="hover:bg-slate-50 transition-colors">
                         <td className="px-3 py-2.5">
                           <div className="font-bold text-slate-900 text-xs sm:text-sm line-clamp-1">
                             {t.tournament_name || t.title}
                           </div>
                           <div className="text-[10px] text-slate-500 mt-0.5 flex flex-wrap items-center gap-x-1.5">
-                            <span>📍 {t.course_name || 'Amata Spring CC'}</span>
+                            <span className="truncate max-w-[140px] inline-block">
+                              📍 {displayCourseName}
+                            </span>
                             <span className="text-slate-300">|</span>
-                            <span>📅 {t.event_date || t.date || '2026-07-23'}</span>
+                            <span>📅 {displayEventDate}</span>
                           </div>
                         </td>
 
-                        {/* 🎯 ปรับแต่งการแสดงผลคอลัมน์ Holes / Par ให้ครบถ้วนกระชับตามสั่งป๋าปู */}
+                        {/* 🎯 คอลัมน์ Holes / Par */}
                         <td className="px-2 py-2.5 text-center font-semibold text-slate-600 text-[11px]">
                           {statusKey === 'setup' ? (
                             '-'
@@ -101,6 +112,7 @@ export default function GolferTournaments() {
                           )}
                         </td>
 
+                        {/* 🎯 คอลัมน์ Action */}
                         <td className="px-3 py-2.5 text-right">
                           {statusKey === 'setup' || !t.status ? (
                             <span className={`inline-block text-[10px] px-2 py-1 rounded-md border ${statusConfig.badge}`}>
@@ -108,14 +120,14 @@ export default function GolferTournaments() {
                             </span>
                           ) : statusKey === 'live' ? (
                             <button
-                              onClick={() => navigate(`/golfer/leaderboard?id=${t.tournament_id || t.id}&status=live`)}
+                              onClick={() => navigate(`/golfer/leaderboard?id=${currentMatchId}&status=live`)}
                               className={`inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-md cursor-pointer ${statusConfig.button}`}
                             >
                               ⚡ Live!
                             </button>
                           ) : (
                             <button
-                              onClick={() => navigate(`/golfer/leaderboard?id=${t.tournament_id || t.id}&status=final`)}
+                              onClick={() => navigate(`/golfer/leaderboard?id=${currentMatchId}&status=final`)}
                               className={`inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-md cursor-pointer ${statusConfig.button}`}
                             >
                               📊 Final
