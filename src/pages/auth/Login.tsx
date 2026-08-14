@@ -6,13 +6,13 @@ import Swal from "sweetalert2"; // 🛡️ นำเข้าขุมพลั�
 
 /**
  * 🎯 วัตถุประสงค์: หน้าจอเข้าสู่ระบบอัจฉริยะ (Hybrid Failback Login Screen)
- * @description ออกแบบโครงสร้างรองรับ Virtual Keyboard บน iPhone SE โดยปล่อยระนาบเนื้อหายืดดิ่งธรรมชาติ[cite: 14]
- * @param credentials วัตถุข้อมูลรหัสผ่าน { username, password } ส่งเข้าตู้ Zustand store[cite: 14]
+ * @description ออกแบบโครงสร้างรองรับ Virtual Keyboard บน iPhone SE โดยปล่อยระนาบเนื้อหายืดดิ่งธรรมชาติ
+ * @param credentials วัตถุข้อมูลรหัสผ่าน { username, password } ส่งเข้าตู้ Zustand store
  */
 export default function Login() {
   const navigate = useNavigate();
   
-  // 🧠 ดึง Action ล็อกอินหลัก และสเตตัสการโหลดมาจากสมองกลกลาง Zustand[cite: 14]
+  // 🧠 ดึง Action ล็อกอินหลัก และสเตตัสการโหลดมาจากสมองกลกลาง Zustand
   const loginGolfer = useGolfStore((state: any) => state.loginGolfer);
   const isLoading = useGolfStore((state: any) => state.isLoading);
 
@@ -51,18 +51,18 @@ export default function Login() {
     }
 
     try {
-      // 🚀 ส่งกระแสคำสั่งมุดอุโมงค์เข้าหาคลังสมองกล Zustand store ข้ามอุปกรณ์[cite: 14]
+      // 🚀 ส่งกระแสคำสั่งมุดอุโมงค์เข้าหาคลังสมองกล Zustand store ข้ามอุปกรณ์
       const result = await loginGolfer({ username, password });
 
       if (result?.success) {
-        // 🎯 แกะข้อมูลผู้ใช้จริงจาก Response[cite: 14]
+        // 🎯 แกะข้อมูลผู้ใช้จริงจาก Response
         const userData = result?.user || result?.data || {};
         const role = userData?.global_role || "GOLFER";
         const fullName = userData?.fullname || username;
         const nickName = userData?.nickname ? ` (${userData.nickname})` : "";
         const roleThai = getRoleThaiName(role);
 
-        // 🌟 ทางเลือก 2: ปลุกเสกกล่องความสำเร็จ แสดงชื่อผู้เล่น + สิทธิ์ ไร้ Hardcode[cite: 14]
+        // 🌟 ทางเลือก 2: ปลุกเสกกล่องความสำเร็จ แสดงชื่อผู้เล่น + สิทธิ์ ไร้ Hardcode
         Swal.fire({
           icon: "success",
           title: `ยินดีต้อนรับครับคุณ ${fullName}${nickName}`,
@@ -71,15 +71,15 @@ export default function Login() {
           showConfirmButton: false,
         });
 
-        // 🔀 นำทางพายูสเซอร์ทุกบทบาทอพยพไปยังตารางทัวร์นาเมนต์หลัก[cite: 14]
+        // 🔀 นำทางพายูสเซอร์ทุกบทบาทอพยพไปยังตารางทัวร์นาเมนต์หลัก
         if (role === "TD" || role === "ADMIN") {
-          navigate("/td/tournaments"); // ➡️ ฝั่งบริหารจัดการเข้าหน้าทัวร์นาเมนต์ TD[cite: 14]
+          navigate("/td/tournaments"); // ➡️ ฝั่งบริหารจัดการเข้าหน้าทัวร์นาเมนต์ TD
         } else {
-          navigate("/golfer/tournaments"); // ➡️ GOLFER และ SCORER เข้าหน้าทัวร์นาเมนต์สโมสร[cite: 14]
+          navigate("/golfer/tournaments"); // ➡️ GOLFER และ SCORER เข้าหน้าทัวร์นาเมนต์สโมสร
         }
       }
     } catch (error: any) {
-      // 🛡️ ด่านที่ 2: ระบบบริหารจัดการข้อผิดพลาดกรณีเกิด Error จริงหลังบ้าน (Error Handling Integration)[cite: 14]
+      // 🛡️ ด่านที่ 2: ระบบบริหารจัดการข้อผิดพลาดกรณีเกิด Error จริงหลังบ้าน (Error Handling Integration)
       console.error("📢 ตรวจพบสัญญาณขัดข้องฝั่งด่านหน้า:", error);
       
       Swal.fire({
@@ -95,18 +95,18 @@ export default function Login() {
     // 📱 ใช้กฎระเบียบคุมมิติหน้าจอ: ปล่อยเนื้อหายืดดิ่งอิสระ Window Scroll คอนฟิกรองรับ Virtual Keyboard[cite: 14, 16]
     <div className="w-full min-h-screen bg-slate-50 text-slate-900 font-sans flex flex-col justify-start items-center p-4 pt-12">
       
-      {/* โลโก้ตรายางสโมสรจัดวางเยื้องตำแหน่งบนสุด[cite: 14] */}
+      {/* โลโก้ตรายางสโมสรจัดวางเยื้องตำแหน่งบนสุด */}
       <div className="text-center mb-6">
         <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-slate-900 text-white text-3xl font-black mb-2 shadow-md">
           ⛳
         </div>
         <h1 className="text-xl font-black tracking-tight text-slate-900">GOLF-TD PLATFORM</h1>
         <p className="text-[11px] text-slate-400 font-medium mt-0.5 uppercase tracking-wider">
-          Tournament Director & Live Scoring System[cite: 14]
+          Tournament Director & Live Scoring System
         </p>
       </div>
 
-      {/* 🏗️ กรอบกล่องฟอร์ม ลอยตัวอิสระ ไม่ล็อกความสูง ป้องกันแป้นพิมพ์คีย์บอร์ดมือถือดีดบังขอบล่าง[cite: 14] */}
+      {/* 🏗️ กรอบกล่องฟอร์ม ลอยตัวอิสระ ไม่ล็อกความสูง ป้องกันแป้นพิมพ์คีย์บอร์ดมือถือดีดบังขอบล่าง */}
       <div className="w-full max-w-sm bg-white rounded-2xl border border-slate-200 shadow-xl p-5">
         <h2 className="text-sm font-black text-slate-900 uppercase tracking-wide border-b border-slate-100 pb-2 mb-4 text-left">
           🔐 ลงชื่อเข้าสู่สนามแข่งขัน
@@ -164,12 +164,10 @@ export default function Login() {
         </form>
       </div>
 
-      {/* แถบแจ้งเตือนระดับวินัยความเสถียรใต้กล่องฟอร์ม */}
-      <div className="mt-4 max-w-sm text-center">
-        <p className="text-[10px] text-slate-400 italic">
-          * ระบบสวมเกราะ High-Stability Hybrid Failback Ready[cite: 14] หาก pp1 ขาดการเชื่อมต่อ ระบบจะปลดล็อก Persona ออฟไลน์ให้ลุยงานต่อทันทีครับป๋าปู![cite: 14]
-        </p>
-      </div>
+      {/* 📄 Responsive Footer */}
+      <footer className="mt-4 pt-2 border-t border-slate-100 text-center text-[10px] text-slate-400 font-medium shrink-0">
+        <p>Copyright © 2026 Chatchai Suriyawan. All rights reserved.</p>
+      </footer>
 
     </div>
   );

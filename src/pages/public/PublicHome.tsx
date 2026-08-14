@@ -19,9 +19,12 @@ export default function PublicHome() {
         </p>
       </div>
 
-      <div className="text-[11px] text-gray-400 font-medium">
-        สัจจะโครงการพัฒนาด้วยความลื่นไหลร่วมกับป๋าปูและเจ็มคุง 😊
-      </div>
+
+      {/* 📄 Responsive Footer */}
+      <footer className="mt-4 pt-2 border-t border-slate-100 text-center text-[10px] text-slate-400 font-medium shrink-0">
+        <p>สัจจะโครงการพัฒนาด้วยความลื่นไหลร่วมกับป๋าปูและเจ็มคุง 😊</p>
+        <p>Copyright © 2026 Chatchai Suriyawan. All rights reserved.</p>
+      </footer>
     </div>
   );
 }
