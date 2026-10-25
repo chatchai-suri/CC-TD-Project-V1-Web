@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "start": "serve -s dist -l 5173"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.1",
@@ -15,6 +16,7 @@
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "react-router-dom": "^7.18.0",
+    "serve": "^14.2.6",
     "sweetalert2": "^11.26.25",
     "zustand": "^5.0.14"
   },
