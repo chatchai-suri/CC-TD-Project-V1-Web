@@ -5,9 +5,10 @@ import Swal from "sweetalert2";
 
 export const useGolfStore = create<any>((set: any, get: any) => ({
 
-  // 🔐 Authentication State & Actions
+// 🔐 Authentication State & Actions
   currentUser: null,
   isLoading: false,
+  isCheckingAuth: true, // 👈 เพิ่มสถานะตรวจเช็กตัวตนเริ่มต้น (ป้องกันหน้าจอกระพริบตอนกด Refresh)
   error: null,
 
   registerGolfer: async (userData: any) => {
@@ -26,7 +27,13 @@ export const useGolfStore = create<any>((set: any, get: any) => ({
     set({ isLoading: true, error: null });
     try {
       const response = await apiService.post('/auth/login', credentials);
-      const { data } = response.data;
+      const { data, token } = response.data; // 👈 ดึงทั้ง data และ token ที่หลังบ้านส่งมา
+      
+      // 💾 บันทึกตั๋วเก็บลงกระเป๋าเสื้อ (localStorage)
+      if (token) {
+        localStorage.setItem('token', token);
+      }
+
       console.log("✅ Login Success - Authenticated User Data:", data);
       set({ currentUser: data, isLoading: false, error: null });
       return response.data;
@@ -35,6 +42,46 @@ export const useGolfStore = create<any>((set: any, get: any) => ({
       set({ currentUser: null, isLoading: false, error: error });
       throw error;
     }
+  },
+
+  // 🔄 Action ใหม่: กู้คืนสถานะตัวตนตอน Refresh หน้าจอ (Session Rehydration)
+  checkAuth: async () => {
+    const token = localStorage.getItem('token');
+    
+    // หากในเบราว์เซอร์ไม่มีตั๋ว ให้จบการตรวจทันที
+    if (!token) {
+      set({ currentUser: null, isCheckingAuth: false });
+      return null;
+    }
+
+    try {
+      // ยิงตรวจตั๋วกับหลังบ้าน (Axios Interceptor จะแนบ Token ไปให้เอง)
+      const response = await apiService.get('/auth/me');
+      const user = response?.data?.user;
+
+      console.log("🔄 Session Rehydrated via /auth/me:", user);
+      set({ currentUser: user, isCheckingAuth: false });
+      return user;
+    } catch (error) {
+      console.warn("⚠️ Token หมดอายุหรือไม่ถูกต้อง ล้างค่าออกจากระบบ:", error);
+      localStorage.removeItem('token');
+      set({ currentUser: null, isCheckingAuth: false });
+      return null;
+    }
+  },
+
+  logout: () => {
+    // 🗑️ เผาตั๋วทิ้งเมื่อออกจากระบบ
+    localStorage.removeItem('token');
+    set({ 
+      currentUser: null, 
+      tournaments: [], 
+      currentFlight: [], 
+      tournamentResult: null, 
+      userList: [],
+      courseHoles: [],
+      activeTournamentId: null
+    });
   },
   
   // ⛳ Repositories & Metadata Cache
@@ -281,17 +328,6 @@ fetchFlightDetails: async (tournamentId: string) => {
     }
   },
 
-  logout: () => {
-    set({ 
-      currentUser: null, 
-      tournaments: [], 
-      currentFlight: [], 
-      tournamentResult: null, 
-      userList: [],
-      courseHoles: [],
-      activeTournamentId: null
-    });
-  },
 
   // 🟢 Action สำหรับสลับสถานะแมตช์ (Hybrid Offline/Online Status Switching)
   updateMatchStatus: async (tournamentId: string | number, newStatus: string) => {
