@@ -488,5 +488,68 @@ fetchCourses: async () => {
   }
 },
 
+changeUserRole: async (userId: number, global_role: string) => {
+  try {
+    const res = await apiService.post('/admin/user/changeRole', { userId, global_role });
+    if (res.data.success) {
+      // อัปเดตข้อมูลในตาราง userList บน Store ทันที
+      const updatedList = get().userList.map((u: any) => 
+        u.user_id === userId ? { ...u, global_role } : u
+      );
+      set({ userList: updatedList });
+      return { success: true };
+    }
+  } catch (error: any) {
+    Swal.fire({
+      title: "ผิดพลาด!",
+      text: error?.message || "ไม่สามารถเปลี่ยนสิทธิ์ได้",
+      icon: "error",
+      background: "#0f172a",
+      color: "#fff",
+    });
+    throw error;
+  }
+},
+
+resetUserPassword: async (userId: number, fullname: string) => {
+  const result = await Swal.fire({
+    title: "ยืนยันรีเซ็ตรหัสผ่าน?",
+    text: `ต้องการรีเซ็ตรหัสผ่านของ "${fullname}" เป็น 123456 ใช่หรือไม่?`,
+    icon: "warning",
+    showCancelButton: true,
+    confirmButtonColor: "#10b981",
+    cancelButtonColor: "#64748b",
+    confirmButtonText: "ใช่, รีเซ็ตเลย!",
+    cancelButtonText: "ยกเลิก",
+    background: "#0f172a",
+    color: "#fff",
+  });
+
+  if (result.isConfirmed) {
+    try {
+      const res = await apiService.post('/admin/user/reset-password', { userId });
+      if (res.data.success) {
+        Swal.fire({
+          title: "สำเร็จ!",
+          text: res.data.message || "รีเซ็ตรหัสผ่านเรียบร้อยแล้ว",
+          icon: "success",
+          timer: 2000,
+          showConfirmButton: false,
+          background: "#0f172a",
+          color: "#fff",
+        });
+      }
+    } catch (error: any) {
+      Swal.fire({
+        title: "ผิดพลาด!",
+        text: error?.message || "ไม่สามารถรีเซ็ตรหัสผ่านได้",
+        icon: "error",
+        background: "#0f172a",
+        color: "#fff",
+      });
+    }
+  }
+},
+
 }));
 
